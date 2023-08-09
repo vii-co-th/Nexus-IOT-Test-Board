@@ -4,6 +4,8 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 
+#define test  0
+
 #define SW1 45
 #define SW2 46
 #define SW3 47
@@ -40,17 +42,79 @@
 #define ONEWIRE 15
 #define TX485 14
 
+//sdcard
+#include "FS.h"
+#include "SD.h"
+void listDir(fs::FS &fs, const char * dirname, uint8_t levels);
+void createDir(fs::FS &fs, const char * path);
+void removeDir(fs::FS &fs, const char * path);
+void readFile(fs::FS &fs, const char * path);
+void writeFile(fs::FS &fs, const char * path, const char * message);
+void appendFile(fs::FS &fs, const char * path, const char * message);
+void renameFile(fs::FS &fs, const char * path1, const char * path2);
+void deleteFile(fs::FS &fs, const char * path);
+void testFileIO(fs::FS &fs, const char * path);
+
 #include <MHZCO2.h>
 MHZ19E mhz19e;
 
 #include <OneWire.h>
 OneWire  ow(ONEWIRE);  // on pin 10 (a 4.7K resistor is necessary)
 
+//OLED
+#define SCREEN_WIDTH 128 // OLED display width, in pixels
+#define SCREEN_HEIGHT 32 // OLED display height, in pixels
+
+// Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
+// The pins for I2C are defined by the Wire-library. 
+// On an arduino UNO:       A4(SDA), A5(SCL)
+// On an arduino MEGA 2560: 20(SDA), 21(SCL)
+// On an arduino LEONARDO:   2(SDA),  3(SCL), ...
+#define OLED_RESET     -1 // Reset pin # (or -1 if sharing Arduino reset pin)
+#define SCREEN_ADDRESS 0x3C ///< See datasheet for Address; 0x3D for 128x64, 0x3C for 128x32
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+#define NUMFLAKES     10 // Number of snowflakes in the animation example
+
+#define LOGO_HEIGHT   16
+#define LOGO_WIDTH    16
+static const unsigned char PROGMEM logo_bmp[] =
+{ 0b00000000, 0b11000000,
+  0b00000001, 0b11000000,
+  0b00000001, 0b11000000,
+  0b00000011, 0b11100000,
+  0b11110011, 0b11100000,
+  0b11111110, 0b11111000,
+  0b01111110, 0b11111111,
+  0b00110011, 0b10011111,
+  0b00011111, 0b11111100,
+  0b00001101, 0b01110000,
+  0b00011011, 0b10100000,
+  0b00111111, 0b11100000,
+  0b00111111, 0b11110000,
+  0b01111100, 0b11110000,
+  0b01110000, 0b01110000,
+  0b00000000, 0b00110000 };
+
+void testdrawline();
+void testdrawrect(void);
+void testfillrect(void);
+void testdrawcircle(void);
+void testfillcircle(void);
+void testdrawroundrect(void);
+void testfillroundrect(void);
+void testdrawtriangle(void);
+void testfilltriangle(void);
+void testdrawchar(void);
+void testdrawstyles(void);
+void testscrolltext(void);
+void testdrawbitmap(void);
+void testanimate(const uint8_t *bitmap, uint8_t w, uint8_t h);
+
 //MODBUS RTU
 #include <ModbusRTUSlave.h>
 #define RS485RE_DE  TX485
 #define MODBUSBASEADDR  0
-const byte id = 0x55;
+const byte id = 1;
 const unsigned long baud = 9600;
 const uint32_t config = SERIAL_8N1;
 const unsigned int bufSize = 256;
@@ -249,7 +313,7 @@ uint8_t isWiFi = 0;
 #define ESP_getChipId()   ((uint32_t)ESP.getEfuseMac())
 
 // SSID and PW for Config Portal
-char host[] = "duet";
+char host[] = "nexusiot";
 String ssid = host + String(ESP_getChipId(), HEX).substring(String(ESP_getChipId(), HEX).length()-4);
 const char* password = "lambda1234";
 
@@ -622,7 +686,7 @@ void handleCMD()
     uint8_t ips[4];
     while(ptr != NULL && c < 4) {
         ips[c++] =  atoi(ptr);
-        //sSerial.printf("data: %s (%d)\n", ptr, ips[c-1]);
+        //Serial.printf("data: %s (%d)\n", ptr, ips[c-1]);
         ptr = strtok(NULL, delimiter);
     }
     if (c == 4 && ptr == NULL) {
@@ -648,7 +712,7 @@ void handleCMD()
     uint8_t ips[4];
     while(ptr != NULL && c < 4) {
         ips[c++] =  atoi(ptr);
-        //sSerial.printf("data: %s (%d)\n", ptr, ips[c-1]);
+        //Serial.printf("data: %s (%d)\n", ptr, ips[c-1]);
         ptr = strtok(NULL, delimiter);
     }
     if (c == 4 && ptr == NULL) {
@@ -674,7 +738,7 @@ void handleCMD()
     uint8_t ips[4];
     while(ptr != NULL && c < 4) {
         ips[c++] =  atoi(ptr);
-        //sSerial.printf("data: %s (%d)\n", ptr, ips[c-1]);
+        //Serial.printf("data: %s (%d)\n", ptr, ips[c-1]);
         ptr = strtok(NULL, delimiter);
     }
     if (c == 4 && ptr == NULL) {
@@ -700,7 +764,7 @@ void handleCMD()
     uint8_t ips[4];
     while(ptr != NULL && c < 4) {
         ips[c++] =  atoi(ptr);
-        //sSerial.printf("data: %s (%d)\n", ptr, ips[c-1]);
+        //Serial.printf("data: %s (%d)\n", ptr, ips[c-1]);
         ptr = strtok(NULL, delimiter);
     }
     if (c == 4 && ptr == NULL) {
@@ -846,7 +910,7 @@ void handleCMD()
     strcpy(html,"unknown cmd");
   }
 
-  //sSerial.printf("p=%s, adminpassword=%s, p=adminpassword-->%d, server.arg(\"p\").equals(adminpassword)-->%d\r\n",server.arg("p").c_str(),adminpassword.c_str(),!strcmp(server.arg("p").c_str(),adminpassword.c_str()),server.arg("p").equals(adminpassword));
+  //Serial.printf("p=%s, adminpassword=%s, p=adminpassword-->%d, server.arg(\"p\").equals(adminpassword)-->%d\r\n",server.arg("p").c_str(),adminpassword.c_str(),!strcmp(server.arg("p").c_str(),adminpassword.c_str()),server.arg("p").equals(adminpassword));
   if (server.hasArg("netinfo") || server.hasArg("ip") || server.hasArg("sn") || server.hasArg("gw") || 
       server.hasArg("dns") || server.hasArg("wifissid") || server.hasArg("wifipass") ||
       server.hasArg("dhcp") || server.hasArg("adminpass") ||
@@ -1080,10 +1144,10 @@ void write_adminpass_eeprom (char *s)
 
 void write_station_eeprom (int addr, IPAddress data)
 {
- //sSerial.printf("addr:%d\r\n",addr);
+ //Serial.printf("addr:%d\r\n",addr);
   for (int i = 0; i < 4; ++i) {
     EEPROM.write(addr+i,data[i]);
-    //sSerial.printf("data:%d\r\n",data[i]);
+    //Serial.printf("data:%d\r\n",data[i]);
   }
   EEPROM.commit();
 }
@@ -1116,10 +1180,10 @@ void enable_wifi()
       wifissid += pwd_ch;
       ++pwd_c;
     } while (pwd_ch != '\000');    
-    sSerial.printf("EEPROM wifi-ssid=%s\r\n",wifissid.c_str());
+    Serial.printf("EEPROM wifi-ssid=%s\r\n",wifissid.c_str());
   }
   else {
-    sSerial.printf("default wifi-ssid=%s\r\n",wifissid.c_str());    
+    Serial.printf("default wifi-ssid=%s\r\n",wifissid.c_str());    
   }
 
   if (EEPROM.read(__WIFIPASS_ADDR__) != 0xff) {
@@ -1130,10 +1194,10 @@ void enable_wifi()
       wifipassword += pwd_ch;
       ++pwd_c;
     } while (pwd_ch != '\000');    
-    sSerial.printf("EEPROM wifi-pass=%s\r\n",wifipassword.c_str());
+    Serial.printf("EEPROM wifi-pass=%s\r\n",wifipassword.c_str());
   }
   else {
-    sSerial.printf("default wifi-pass=%s\r\n",wifipassword.c_str());    
+    Serial.printf("default wifi-pass=%s\r\n",wifipassword.c_str());    
   }
 
   if (EEPROM.read(__ADMINPASS_ADDR__) != 0xff) {
@@ -1144,10 +1208,10 @@ void enable_wifi()
       adminpassword += pwd_ch;
       ++pwd_c;
     } while (pwd_ch != '\000');    
-    sSerial.printf("EEPROM admin-pass=%s\r\n",adminpassword.c_str());
+    Serial.printf("EEPROM admin-pass=%s\r\n",adminpassword.c_str());
   }
   else {
-    sSerial.printf("default admin-pass=%s\r\n",adminpassword.c_str());    
+    Serial.printf("default admin-pass=%s\r\n",adminpassword.c_str());    
   }
 
   if (EEPROM.read(__SERVER_ADDR__) != 0xff) {
@@ -1158,10 +1222,10 @@ void enable_wifi()
       remote_server += pwd_ch;
       ++pwd_c;
     } while (pwd_ch != '\000');    
-    sSerial.printf("EEPROM remote-server=%s\r\n",remote_server.c_str());
+    Serial.printf("EEPROM remote-server=%s\r\n",remote_server.c_str());
   }
   else {
-    sSerial.printf("default remote-server=%s\r\n",remote_server.c_str());    
+    Serial.printf("default remote-server=%s\r\n",remote_server.c_str());    
   }
 
   //init station info
@@ -1198,7 +1262,7 @@ void enable_wifi()
     isDHCP = 1;
   }
 
-  sSerial.printf("\r\n\r\nSaved IP Info:\r\nIP = %d.%d.%d.%d\r\nSub Netmask = %d.%d.%d.%d\r\nGateway IP = %d.%d.%d.%d\r\nDNS IP = %d.%d.%d.%d\r\nDHCP = %s\r\n",
+  Serial.printf("\r\n\r\nSaved IP Info:\r\nIP = %d.%d.%d.%d\r\nSub Netmask = %d.%d.%d.%d\r\nGateway IP = %d.%d.%d.%d\r\nDNS IP = %d.%d.%d.%d\r\nDHCP = %s\r\n",
     myip[0],myip[1],myip[2],myip[3],
     mysn[0],mysn[1],mysn[2],mysn[3],
     mygw[0],mygw[1],mygw[2],mygw[3],
@@ -1208,20 +1272,20 @@ void enable_wifi()
 
   isWiFi = 0;
   mac4 = WiFi.macAddress().substring(12,14)+WiFi.macAddress().substring(15,17);
-  sSerial.print("MAC :");
-  sSerial.print(WiFi.macAddress());  
-  sSerial.print(" ("+mac4+")");
+  Serial.print("MAC :");
+  Serial.print(WiFi.macAddress());  
+  Serial.print(" ("+mac4+")");
   ssid = host + mac4;  
 //*/
   if (isDHCP == 1) {
-      sSerial.println("\r\nStation uses DHCP");
+      Serial.println("\r\nStation uses DHCP");
   }
   else {
     if (!WiFi.config(myip, mygw, mysn, mydns, primaryDNS)) {
-      sSerial.println("STA Failed to configure");
+      Serial.println("STA Failed to configure");
     }
     else {
-      sSerial.printf("\r\nManual Station Info:\r\nIP = %d.%d.%d.%d\r\nSub Netmask = %d.%d.%d.%d\r\nGateway IP = %d.%d.%d.%d\r\nDNS IP = %d.%d.%d.%d\r\n",
+      Serial.printf("\r\nManual Station Info:\r\nIP = %d.%d.%d.%d\r\nSub Netmask = %d.%d.%d.%d\r\nGateway IP = %d.%d.%d.%d\r\nDNS IP = %d.%d.%d.%d\r\n",
         myip[0],myip[1],myip[2],myip[3],
         mysn[0],mysn[1],mysn[2],mysn[3],
         mygw[0],mygw[1],mygw[2],mygw[3],
@@ -1238,16 +1302,16 @@ void enable_wifi()
 
   WiFi.mode(WIFI_AP_STA);
 
-  sSerial.printf("\r\n#AP SSID = %s\r\n",ssid.c_str());
-  sSerial.printf("#AP Pass = %s\r\n",password);
-  sSerial.print("#AP IP = ");
-  sSerial.println(WiFi.softAPIP());
+  Serial.printf("\r\n#AP SSID = %s\r\n",ssid.c_str());
+  Serial.printf("#AP Pass = %s\r\n",password);
+  Serial.print("#AP IP = ");
+  Serial.println(WiFi.softAPIP());
 
   WiFi.setHostname(host);
   WiFi.begin(wifissid.c_str(), wifipassword.c_str());
 
-  sSerial.printf("#WiFi SSID = %s\r\n",wifissid.c_str());
-  sSerial.printf("#WiFi Pass = %s\r\n",wifipassword.c_str());
+  Serial.printf("#WiFi SSID = %s\r\n",wifissid.c_str());
+  Serial.printf("#WiFi Pass = %s\r\n",wifipassword.c_str());
 
   uint8_t twifi = 0;
 
@@ -1255,7 +1319,7 @@ void enable_wifi()
   while (WiFi.status() != WL_CONNECTED) {
     esp_task_wdt_reset();
     delay(500);
-    sSerial.print(".");
+    Serial.print(".");
     if (twifi == 0) {
       twifi = 1;
     }
@@ -1263,7 +1327,7 @@ void enable_wifi()
       twifi = 0;
     }
     if (++wc >= WAITWIFI) {
-      sSerial.printf("\r\nBreak.. Can't connect WIFI SSID=%s with password '%s', please re-config via AP.\r\n",wifissid.c_str(),wifipassword.c_str());
+      Serial.printf("\r\nBreak.. Can't connect WIFI SSID=%s with password '%s', please re-config via AP.\r\n",wifissid.c_str(),wifipassword.c_str());
       delay(5000);
       break;
     }
@@ -1273,29 +1337,29 @@ void enable_wifi()
   if (wc < 60) {
     isWiFi = 1;
     wifistarttime = millis();
-    sSerial.println("");
-    sSerial.println("#WiFi connected");
-    sSerial.print("#Client  IP address: ");
-    sSerial.println(WiFi.localIP());
-    sSerial.print("#Client  SN address: ");
-    sSerial.println(WiFi.subnetMask());
-    sSerial.print("#Client  GW address: ");
-    sSerial.println(WiFi.gatewayIP());
-    sSerial.print("#Client DNS address: ");
-    sSerial.println(WiFi.dnsIP());
+    Serial.println("");
+    Serial.println("#WiFi connected");
+    Serial.print("#Client  IP address: ");
+    Serial.println(WiFi.localIP());
+    Serial.print("#Client  SN address: ");
+    Serial.println(WiFi.subnetMask());
+    Serial.print("#Client  GW address: ");
+    Serial.println(WiFi.gatewayIP());
+    Serial.print("#Client DNS address: ");
+    Serial.println(WiFi.dnsIP());
 
 
     /*use mdns for host name resolution*/
     if (!MDNS.begin(host)) { //http://{host}.local
-      sSerial.println("#Error setting up MDNS responder!");
+      Serial.println("#Error setting up MDNS responder!");
       //while (1) {
       // delay(1000);
       //}
     }
     else {
-      sSerial.print("#mDNS responder started http://");    
-      sSerial.print(host);    
-      sSerial.println(".local");    
+      Serial.print("#mDNS responder started http://");    
+      Serial.print(host);    
+      Serial.println(".local");    
     }
   }
 
@@ -1339,10 +1403,10 @@ void enable_wifi()
   }, []() {
     HTTPUpload& upload = server.upload();
     if (upload.status == UPLOAD_FILE_START) {
-      sSerial.printf("#Firmware Upload Start, Stop WDT\r\n");
+      Serial.printf("#Firmware Upload Start, Stop WDT\r\n");
       esp_task_wdt_delete(NULL);
       esp_task_wdt_deinit();
-      sSerial.printf("Update: %s\n", upload.filename.c_str());
+      Serial.printf("Update: %s\n", upload.filename.c_str());
       if (!Update.begin(UPDATE_SIZE_UNKNOWN)) { //start with max available size
         Update.printError(Serial);
       }
@@ -1353,7 +1417,7 @@ void enable_wifi()
       }
     } else if (upload.status == UPLOAD_FILE_END) {
       if (Update.end(true)) { //true to set the size to the current progress
-        sSerial.printf("Update Success: %u\nRebooting...\n", upload.totalSize);
+        Serial.printf("Update Success: %u\nRebooting...\n", upload.totalSize);
       } else {
         Update.printError(Serial);
       }
@@ -1412,29 +1476,34 @@ void write_mqtttopic_eeprom (char *s)
   EEPROM.commit();
 }
 
-void setup() {
-  delay(2000);
-
-  // put your setup code here, to run once:
+#if test == 0
+void setup()
+{
   EEPROM.begin(512);
-  sSerial.begin(19200, EspSoftwareSerial::SWSERIAL_8N1, RX0, TX0);
-  Serial.begin(9600,SERIAL_8N1, PMRX, PMTX);
-  //Serial.begin(115200, SERIAL_8N1, RX0, TX0);
-  Wire.begin(SDA,SCL);
+  Serial.begin(9600);
 
-  pinMode(SW1,INPUT);
-  pinMode(SW2,INPUT);
+  Wire.begin(SDA,SCL);
+  
+  //gpio_reset_pin(GPIO_NUM_40);
+  //gpio_pulldown_dis(GPIO_NUM_40);
+  //gpio_pullup_dis(GPIO_NUM_40);
+  //gpio_iomux_out(GPIO_NUM_40,FUNC_MTDO_GPIO40,false);
+  pinMode(SW1,INPUT_PULLUP);
+  pinMode(SW2,INPUT_PULLUP);
   pinMode(SW3,INPUT);
   pinMode(SW4,INPUT);
+  pinMode(BUZZER,OUTPUT);
+  pinMode(LED_STATUS,OUTPUT);
   pinMode(SDCD,INPUT);
   pinMode(TX485,OUTPUT);
   pinMode(CTRL4GWIFI,OUTPUT);
   pinMode(SDCS,OUTPUT);
   pinMode(EXCS,OUTPUT);
+  
 
   esp_task_wdt_init(WDT_TIMEOUT, true);  // enable panic so ESP32 restarts
   esp_task_wdt_add(NULL);  
-  sSerial.println("#Start wifi...");
+  Serial.println("#Start wifi...");
   enable_wifi();
 
   if (WiFi.status() == WL_CONNECTED) {
@@ -1454,45 +1523,186 @@ void setup() {
   }
 
   if (! rtc.begin()) {
-    sSerial.println("#Couldn't find RTC.");
+    Serial.println("#Couldn't find RTC.");
   }
   else {
-    sSerial.println("#RTC init Ok.");
+    Serial.println("#RTC init Ok.");
     rtc.start();
   }
 
   if (WiFi.status() == WL_CONNECTED) {
-    DateTime now = rtc.now();
-    if (now.year() < 22) {
-      sSerial.printf("#Date Time seem not valid, request NTP...");
+    if (!request_ntp_setdatetime(10)) {
       if (!request_ntp_setdatetime(10)) {
         if (!request_ntp_setdatetime(10)) {
-          if (!request_ntp_setdatetime(10)) {
-            sSerial.printf("#Too many retry NTP request, reboot...");
-            ESP.restart();
-          }
+          Serial.printf("#Too many retry NTP request, reboot...");
+          ESP.restart();
         }
       }
     }
-    else {
-      sSerial.printf("#Date Time looks Ok, no need to request NTP.\r\n");
-    }    
   }
-
-  mhz19e.begin(&Serial2);
-  Serial2.begin(9600,SERIAL_8N1,CO2RX,CO2TX);
-  sSerial.print("#mhz19e.measure() = ");
-  sSerial.println(mhz19e.measure());
 
  	SPI.setFrequency(2000000);
 	SPI.begin(SDSCK,SDMISO,SDMOSI); //sck, miso, mosi, ss
 
   test_sdcard();
 
+  Serial1.begin(baud,config,RX1,TX1);
+  modbus.begin(id,baud);
+  modbus.configureInputRegisters(numInputRegisters, inputRegisterRead);
+  Serial.println("#Init MODBUS done.");
+
+  if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
+    Serial.println(F("#SSD1306 allocation failed"));
+    for(;;); // Don't proceed, loop forever
+  }
+  else {
+    Serial.println(F("#SSD1306 allocation ok"));
+  }
+  // Show initial display buffer contents on the screen --
+  // the library initializes this with an Adafruit splash screen.
+  display.clearDisplay();
+  display.setTextSize(2); // Draw 2X-scale text
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(10, 0);
+  display.println(F("#Ready"));
+  display.display();
+
+  digitalWrite(BUZZER,HIGH);
+  Serial.println("#Ready");
+  delay(250);
+  //digitalWrite(BUZZER,LOW);
+  digitalWrite(LED_STATUS,HIGH);
+  //testdrawline();      // Draw many lines
+}
+
+void loop()
+{
+  esp_task_wdt_reset();
+  server.handleClient();
+  modbus.poll();
+  MQTT_CLIENT.loop();
+
+
+  if(digitalRead(SW1)==LOW) {
+    delay(20);
+    if(digitalRead(SW1)==LOW) {
+      Serial.println("#SW1 Press");
+    }
+  }
+
+  if(digitalRead(SW2)==LOW) {
+    delay(20);
+    if(digitalRead(SW2)==LOW) {
+      Serial.println("#SW2 Press");
+    }
+  }
+
+  if(digitalRead(SW3)==LOW) {
+    delay(20);
+    if(digitalRead(SW3)==LOW) {
+      Serial.println("#SW3 Press");
+    }
+  }
+
+  if(digitalRead(SW4)==LOW) {
+    delay(20);
+    if(digitalRead(SW4)==LOW) {
+      Serial.println("#SW4 Press");
+    }
+  }
+
+  if((uint32_t)(millis()-tsendscreen) >= SCREEN_TIME && SCREEN_TIME > 0) {
+    tsendscreen = millis();
+    digitalWrite(LED_STATUS,digitalRead(LED_STATUS)^1);
+    digitalWrite(BUZZER,digitalRead(BUZZER)^1);
+
+  }
+
+}
+#elif test == 1
+void setup() {
+  //delay(2000);
+
+  // put your setup code here, to run once:
+  EEPROM.begin(512);
+  sSerial.begin(9600, EspSoftwareSerial::SWSERIAL_8N1, RX0, TX0);
+  Serial.begin(9600,SERIAL_8N1, PMRX, PMTX);
+  //Serial.begin(115200, SERIAL_8N1, RX0, TX0);
+  Wire.begin(SDA,SCL);
+
+  pinMode(SW1,INPUT_PULLUP);
+  pinMode(SW2,INPUT_PULLUP);
+  
+
+  pinMode(SW3,INPUT);
+  pinMode(SW4,INPUT);
+  pinMode(SDCD,INPUT);
+  pinMode(TX485,OUTPUT);
+  pinMode(CTRL4GWIFI,OUTPUT);
+  pinMode(SDCS,OUTPUT);
+  pinMode(EXCS,OUTPUT);
+
+  esp_task_wdt_init(WDT_TIMEOUT, true);  // enable panic so ESP32 restarts
+  esp_task_wdt_add(NULL);  
+  Serial.println("#Start wifi...");
+  enable_wifi();
+
+  if (WiFi.status() == WL_CONNECTED) {
+    mqtt_iddf = strtol(mac4.c_str(),NULL,16);
+    mqtt_topicdf = "/iaq/" + mac6;
+    enable_mqtt();
+    lastmqtt = millis()-(uint32_t)(mqtt_stime*1000);
+    if(WiFi.status() != WL_CONNECTED) {
+      //lcdtft.println("#WiFi Connection Skipped");
+    }
+    else {
+      //lcdtft.println("#WiFi Connection Ok");
+    }
+  }
+  else {
+    //lcdtft.println("#WiFi Connection Fail!!");
+  }
+
+  if (! rtc.begin()) {
+    Serial.println("#Couldn't find RTC.");
+  }
+  else {
+    Serial.println("#RTC init Ok.");
+    rtc.start();
+  }
+
+  if (WiFi.status() == WL_CONNECTED) {
+    DateTime now = rtc.now();
+    if (now.year() < 22) {
+      Serial.printf("#Date Time seem not valid, request NTP...");
+      if (!request_ntp_setdatetime(10)) {
+        if (!request_ntp_setdatetime(10)) {
+          if (!request_ntp_setdatetime(10)) {
+            Serial.printf("#Too many retry NTP request, reboot...");
+            ESP.restart();
+          }
+        }
+      }
+    }
+    else {
+      Serial.printf("#Date Time looks Ok, no need to request NTP.\r\n");
+    }    
+  }
+
+  mhz19e.begin(&Serial2);
+  Serial2.begin(9600,SERIAL_8N1,CO2RX,CO2TX);
+  Serial.print("#mhz19e.measure() = ");
+  Serial.println(mhz19e.measure());
+
+ 	SPI.setFrequency(2000000);
+	SPI.begin(SDSCK,SDMISO,SDMOSI); //sck, miso, mosi, ss
+
+  //test_sdcard();
+
   Serial1.begin(baud,config);
   modbus.begin(id,baud);
   modbus.configureInputRegisters(numInputRegisters, inputRegisterRead);
-  sSerial.println("#Init MODBUS done.");
+  Serial.println("#Init MODBUS done.");
 
 }
 
@@ -1503,31 +1713,59 @@ void loop() {
   modbus.poll();
   MQTT_CLIENT.loop();
 
+  if(digitalRead(SW1)==LOW) {
+    delay(20);
+    if(digitalRead(SW1)==LOW) {
+      Serial.println("#SW1 Press");
+    }
+  }
+
+  if(digitalRead(SW2)==LOW) {
+    delay(20);
+    if(digitalRead(SW2)==LOW) {
+      Serial.println("#SW2 Press");
+    }
+  }
+
+  if(digitalRead(SW3)==LOW) {
+    delay(20);
+    if(digitalRead(SW3)==LOW) {
+      Serial.println("#SW3 Press");
+    }
+  }
+
+  if(digitalRead(SW4)==LOW) {
+    delay(20);
+    if(digitalRead(SW4)==LOW) {
+      Serial.println("#SW4 Press");
+    }
+  }
+
   if((uint32_t)(millis()-tsendscreen) >= SCREEN_TIME && SCREEN_TIME > 0) {
     tsendscreen = millis();
 
-    sSerial.print("#mhz19e.measure() = ");
+    Serial.print("#mhz19e.measure() = ");
     int ret2 = mhz19e.measure();
-    sSerial.print(ret2);
-    sSerial.print(", first = ");
-    sSerial.print(first);
-    sSerial.print(", co2 = ");
-    sSerial.println(mhz19e.getCO2());
+    Serial.print(ret2);
+    Serial.print(", first = ");
+    Serial.print(first);
+    Serial.print(", co2 = ");
+    Serial.println(mhz19e.getCO2());
     if (ret2 == 0 && !(first==true && mhz19e.getCO2()==500)) {
       first = false;
-      sSerial.print("#CO2:  ");
-      sSerial.print(mhz19e.getCO2());
-      sSerial.print(", MCO2: ");
-      sSerial.print(mhz19e.getMinCO2());
-      sSerial.print(", Temp: ");
-      sSerial.println(mhz19e.getTemperature());
-      //sSerial.print(", Accu: ");
-      //sSerial.println(mhz19e.getAccuracy());
+      Serial.print("#CO2:  ");
+      Serial.print(mhz19e.getCO2());
+      Serial.print(", MCO2: ");
+      Serial.print(mhz19e.getMinCO2());
+      Serial.print(", Temp: ");
+      Serial.println(mhz19e.getTemperature());
+      //Serial.print(", Accu: ");
+      //Serial.println(mhz19e.getAccuracy());
 
       rmodbus[3] = mhz19e.getCO2();
     }
     else {
-      sSerial.println("#CO2 Initializg...");
+      Serial.println("#CO2 Initializg...");
     }
 
     if (readPMSdata(&Serial)) {
@@ -1544,7 +1782,7 @@ void loop() {
 
       uint16_t cpm25 = round(aqi);
 
-      sSerial.printf("%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\r\n",
+      Serial.printf("%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\r\n",
         (uint16_t)round(aqi),
         (uint16_t)pmsdata.pm10_env,
         (uint16_t)pmsdata.pm25_env,
@@ -1563,42 +1801,46 @@ void loop() {
         rmodbus[6] = pmsdata.pm100_env;
 
         sprintf(st,"AQI (PM2.5) = %d",rmodbus[4]);
-        sSerial.println(st);
+        Serial.println(st);
         sprintf(st,"PM 2.5 = %d",rmodbus[5]);
-        sSerial.println(st);
+        Serial.println(st);
         //sprintf(st,"PM 1.0 = %d",rmodbus[6]);
-        //sSerial.println(st);
+        //Serial.println(st);
         sprintf(st,"PM 10 = %d",rmodbus[6]);
-        sSerial.println(st);
+        Serial.println(st);
 
 /*      
       // reading data was successful!
-      sSerial.println();
-      sSerial.println("---------------------------------------");
-      sSerial.print("PM 1.0: "); Serial1.print(pmsdata.pm10_env);
-      sSerial.print("\t\tPM 2.5: "); Serial1.print(pmsdata.pm25_env);
-      sSerial.print("\t\tPM 10: "); Serial1.println(pmsdata.pm100_env);
-      sSerial.println("---------------------------------------");
-      sSerial.print("Size\t> 0.3 um / 0.1L air:"); Serial1.println(pmsdata.particles_03um);
-      sSerial.print("\t> 0.5 um / 0.1L air:"); Serial1.println(pmsdata.particles_05um);
-      sSerial.print("\t> 1.0 um / 0.1L air:"); Serial1.println(pmsdata.particles_10um);
-      sSerial.print("\t> 2.5 um / 0.1L air:"); Serial1.println(pmsdata.particles_25um);
-      sSerial.print("\t> 5.0 um / 0.1L air:"); Serial1.println(pmsdata.particles_50um);
-      sSerial.print("\t> 10 um / 0.1L air:"); Serial1.println(pmsdata.particles_100um);
-      sSerial.println("---------------------------------------");
-      sSerial.print("AQI (PM2.5) = "); Serial1.println((uint16_t)round(aqi));
-      sSerial.println("---------------------------------------");
+      Serial.println();
+      Serial.println("---------------------------------------");
+      Serial.print("PM 1.0: "); Serial1.print(pmsdata.pm10_env);
+      Serial.print("\t\tPM 2.5: "); Serial1.print(pmsdata.pm25_env);
+      Serial.print("\t\tPM 10: "); Serial1.println(pmsdata.pm100_env);
+      Serial.println("---------------------------------------");
+      Serial.print("Size\t> 0.3 um / 0.1L air:"); Serial1.println(pmsdata.particles_03um);
+      Serial.print("\t> 0.5 um / 0.1L air:"); Serial1.println(pmsdata.particles_05um);
+      Serial.print("\t> 1.0 um / 0.1L air:"); Serial1.println(pmsdata.particles_10um);
+      Serial.print("\t> 2.5 um / 0.1L air:"); Serial1.println(pmsdata.particles_25um);
+      Serial.print("\t> 5.0 um / 0.1L air:"); Serial1.println(pmsdata.particles_50um);
+      Serial.print("\t> 10 um / 0.1L air:"); Serial1.println(pmsdata.particles_100um);
+      Serial.println("---------------------------------------");
+      Serial.print("AQI (PM2.5) = "); Serial1.println((uint16_t)round(aqi));
+      Serial.println("---------------------------------------");
 */  
   //    delay(50);
 
     }
     else {
-      sSerial.printf("#can't read PM sensor\n");
+      Serial.printf("#can't read PM sensor\n");
     }
 
 
   }
 }
+
+#else
+#endif
+
 
 // put function definitions here:
 bool request_ntp_setdatetime(int wsec)
@@ -1609,7 +1851,7 @@ bool request_ntp_setdatetime(int wsec)
   // Set offset time in seconds to adjust for your timezone, for example:
   timeClient.setTimeOffset(25200);  //GMT+7
 
-  sSerial.print("#Request NTP...");
+  Serial.print("#Request NTP...");
 
   tstamp = millis();
   while(!timeClient.update() && ((ulong)(millis()-tstamp)) < wsec*1000) {
@@ -1617,17 +1859,17 @@ bool request_ntp_setdatetime(int wsec)
     esp_task_wdt_reset();
   }
   if(((ulong)(millis()-tstamp)) > wsec*1000) {
-    sSerial.println("Failed");
+    Serial.println("Failed");
     return false;
   }
-  sSerial.println("Ok");
+  Serial.println("Ok");
 
   // The formattedDate comes with the following format:
   // 2018-05-28T16:00:13Z
   // We need to extract date and time
   formattedDate = timeClient.getFormattedDate();
-  sSerial.println(formattedDate);
-  //sSerial.printf("Date = %s/%s/%s\r\nTime = %s:%s:%s\r\n",
+  Serial.println(formattedDate);
+  //Serial.printf("Date = %s/%s/%s\r\nTime = %s:%s:%s\r\n",
   //  formattedDate.substring(8,10).c_str(),
   //  formattedDate.substring(5,7).c_str(),
   //  formattedDate.substring(2,4).c_str(),
@@ -1644,12 +1886,11 @@ bool request_ntp_setdatetime(int wsec)
   dh = atoi(formattedDate.substring(11,13).c_str());
   dm = atoi(formattedDate.substring(14,16).c_str());
   ds = atoi(formattedDate.substring(17,19).c_str());
-  rtc.adjust(DateTime(dD,dM,dY,dh,dm,ds));
-  sSerial.printf("NTP Date = %02d/%02d/%04d Time = %02d:%02d:%02d\r\n",dD,dM,2000+dY,dh,dm,ds);
+  Serial.printf("NTP Date = %02d/%02d/%04d Time = %02d:%02d:%02d\r\n",dD,dM,2000+dY,dh,dm,ds);
 
+  rtc.adjust(DateTime(2000+dY,dM,dD,dh,dm,ds));
   DateTime now = rtc.now();
-  sSerial.printf("RTC Date = %02d/%02d/%04d Time = %02d:%02d:%02d Day=%s\r\n",now.day(),now.month(),2000+now.year(),now.hour(),now.minute(),now.second(),daysOfTheWeek[now.dayOfTheWeek()]);
-  sSerial.print(shtml);
+  Serial.printf("RTC Date = %02d/%02d/%04d Time = %02d:%02d:%02d Day=%s\r\n",now.day(),now.month(),now.year(),now.hour(),now.minute(),now.second(),daysOfTheWeek[now.dayOfTheWeek()]);
 
   return true;
 
@@ -1657,73 +1898,50 @@ bool request_ntp_setdatetime(int wsec)
 
 void test_sdcard()
 {
-  digitalWrite(SDCS,LOW);
-  if(!FFat.begin(true)){
-    sSerial.println("#An Error has occurred while mounting FATFS");
+  //digitalWrite(SDCS,LOW);
+
+  if(!SD.begin(SDCS)){
+    Serial.println("#Card Mount Failed");
+    return;
   }
-  else {
-    sSerial.println("#FATFS ready!!");
-    sprintf(shtml,"/partitions-8MB.csv");
+  uint8_t cardType = SD.cardType();
+
+  if(cardType == CARD_NONE){
+    Serial.println("#No SD card attached");
+    return;
+  }
+
+  Serial.print("#SD Card Type: ");
+  if(cardType == CARD_MMC){
+    Serial.println("MMC");
+  } else if(cardType == CARD_SD){
+    Serial.println("SDSC");
+  } else if(cardType == CARD_SDHC){
+    Serial.println("SDHC");
+  } else {
+    Serial.println("UNKNOWN");
+  }
+
+  uint64_t cardSize = SD.cardSize() / (1024 * 1024);
+  Serial.printf("#SD Card Size: %lluMB\n", cardSize);
 /*
-    sprintf(shtml,"/hello.txt");
-    File file0 = FFat.open(shtml, FILE_WRITE);
-    if(!file0){
-      sSerial.printf("− failed to open file %s for writing\r\n",shtml);
-    }
-    else {
-      file0.println("Hello!!");
-      file0.printf("Good bye %s\r\n",shtml);
-      file0.close();
-      sSerial.printf("− write %s ok\r\n",shtml);
-    }
-*/
-    File file = FFat.open(shtml, FILE_READ);
-    if(!file){
-      sSerial.printf("− failed to open file %s for reading\r\n",shtml);
-    }
-    else {
-      while (file.available()) {
-        String first_line = file.readStringUntil('\n');
-        sSerial.print(first_line);
-      }
-      file.close();
-      sSerial.printf("− read %s done\r\n",shtml);
-    }
+  listDir(SD, "/", 0);
+  createDir(SD, "/mydir");
+  listDir(SD, "/", 0);
+  removeDir(SD, "/mydir");
+  listDir(SD, "/", 2);
+  writeFile(SD, "/hello.txt", "Hello ");
+  appendFile(SD, "/hello.txt", "World!\n");
+  readFile(SD, "/hello.txt");
+  deleteFile(SD, "/foo.txt");
+  renameFile(SD, "/hello.txt", "/foo.txt");
+  readFile(SD, "/foo.txt");
+  testFileIO(SD, "/test.txt");
+*/  
+  Serial.printf("#Total space: %lluMB\n", SD.totalBytes() / (1024 * 1024));
+  Serial.printf("#Used space: %lluMB\n", SD.usedBytes() / (1024 * 1024));
 
-    unsigned int totalBytes = FFat.totalBytes();
-    unsigned int usedBytes = FFat.usedBytes();
-    unsigned int freeBytes = FFat.freeBytes();
-
-    sSerial.println("File sistem info.");
-
-    sSerial.print("Total space:      ");
-    sSerial.print(totalBytes);
-    sSerial.println("byte");
-
-    sSerial.print("Total space used: ");
-    sSerial.print(usedBytes);
-    sSerial.println("byte");
-
-    sSerial.print("Total space free: ");
-    sSerial.print(freeBytes);
-    sSerial.println("byte");
-
-    sSerial.println();
-    sSerial.println("Printing filesystem structure and sizes.");
-
-    // Open dir folder
-    File dir = FFat.open("/");
-    // Cycle all the content
-    printDirectory(dir);
-
-    File hello_file = FFat.open(shtml);
-    if (hello_file)
-    {
-      printFile(hello_file);
-    }    
-
-  }
-  digitalWrite(SDCS,HIGH);
+  //digitalWrite(SDCS,HIGH);
 
 }
 
@@ -1740,19 +1958,19 @@ void printDirectory(File dir, int numTabs)
     }
     for (uint8_t i = 0; i < numTabs; i++)
     {
-      sSerial.print('\t');
+      Serial.print('\t');
     }
-    sSerial.print(entry.name());
+    Serial.print(entry.name());
     if (entry.isDirectory())
     {
-      sSerial.println("/");
+      Serial.println("/");
       printDirectory(entry, numTabs + 1);
     }
     else
     {
       // files have sizes, directories do not
-      sSerial.print("\t\t");
-      sSerial.println(entry.size(), DEC);
+      Serial.print("\t\t");
+      Serial.println(entry.size(), DEC);
     }
     entry.close();
   }
@@ -1760,17 +1978,17 @@ void printDirectory(File dir, int numTabs)
 
 void printFile(File &file)
 {
-  sSerial.println("Printing file contents of file: " + String(file.name()));
+  Serial.println("Printing file contents of file: " + String(file.name()));
   while (file.available())
   {
     Serial.write(file.read());
   }
-  sSerial.println("\nPrinting file done.");
+  Serial.println("\nPrinting file done.");
 }
 
 void send_gs(const char *wdata)
 {
-    sSerial.printf("#report google sheet\n");
+    Serial.printf("#report google sheet\n");
 #ifdef USERTC  
     DateTime now = rtc.now();
     sprintf(strdata,"%02d%02d%02d,%02d%02d%02d,%s",
@@ -1787,40 +2005,40 @@ void send_gs(const char *wdata)
       wdata
     );
 #endif    
-    sSerial.printf("#data = %s\r\n",strdata);
-    //sSerial.println("-----------");
+    Serial.printf("#data = %s\r\n",strdata);
+    //Serial.println("-----------");
 
     HTTPClient http;
     String mac = WiFi.macAddress();
-    //sSerial.print("[HTTP] begin...\n");
+    //Serial.print("[HTTP] begin...\n");
     // configure traged server and url
     //sprintf(saveurl,"https://www.lambda-nu.com/sfglog.php?data=%s*%s",strdata);
     //http.begin("https://www.howsmyssl.com/a/check", rootCACertificate); //HTTPS
     String Strdata = strdata;
     sprintf(saveurl,"https://script.google.com/macros/s/%s/exec?%s",deploy_id.c_str(),Strdata.c_str());
     http.begin(saveurl); //HTTP
-    //sSerial.print("[HTTP] GET... ");
-    //sSerial.println(saveurl);
+    //Serial.print("[HTTP] GET... ");
+    //Serial.println(saveurl);
     // start connection and send HTTP header
     int httpCode = http.GET();
 
     // httpCode will be negative on error
     if(httpCode > 0) {
         // HTTP header has been send and Server response header has been handled
-        //sSerial.printf("[HTTP] GET... code: %d\n", httpCode);
+        //Serial.printf("[HTTP] GET... code: %d\n", httpCode);
 
         // file found at server
         if(httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_FOUND) {
             cretry = 0;
             String payload = http.getString();
-            sSerial.println(payload);
+            Serial.println(payload);
         }
         else {
-            sSerial.printf("[HTTP] GET... failed, error: %d %s\r\n",httpCode, http.errorToString(httpCode).c_str());
-            sSerial.printf("[HTTP] URL : %s\r\n",saveurl);
+            Serial.printf("[HTTP] GET... failed, error: %d %s\r\n",httpCode, http.errorToString(httpCode).c_str());
+            Serial.printf("[HTTP] URL : %s\r\n",saveurl);
             String payload = http.getString();
-            sSerial.println(payload);
-            sSerial.printf("Fail : %s\nretry\n", http.errorToString(httpCode).c_str());
+            Serial.println(payload);
+            Serial.printf("Fail : %s\nretry\n", http.errorToString(httpCode).c_str());
             if (cretry < RETRYWEB) {
               preTime = curTime - intervalTime;
               delay(3000);
@@ -1877,23 +2095,23 @@ String urlencode(String str)
 void callback(char* topic, byte* payload, unsigned int length) 
 {
   //digitalWrite(LED_STATUS, HIGH);
-  sSerial.print("\r\n\r\n*** Message arrived [");
-  sSerial.print(topic);
-  sSerial.print("] ");
+  Serial.print("\r\n\r\n*** Message arrived [");
+  Serial.print(topic);
+  Serial.print("] ");
   for (unsigned int i=0;i<length;i++) {
-    sSerial.print((char)payload[i]);
+    Serial.print((char)payload[i]);
   }
-  sSerial.print("\r\n\r\n");
+  Serial.print("\r\n\r\n");
 
   if (length > 0 && !strcmp(topic,mqtt_topic.c_str())) {
     if((char)payload[0] == 'p' || (char)payload[0] == 'P') {
       mqtt_stime = atoi((char *)(payload+1));
       if (mqtt_stime > 60000) mqtt_stime = 60000;
       write_mqttperiod_eeprom(mqtt_stime);
-      sSerial.printf("#set MQTT Period = %d s\n",mqtt_stime);
+      Serial.printf("#set MQTT Period = %d s\n",mqtt_stime);
     } 
   }
-  sSerial.println();
+  Serial.println();
 
   //digitalWrite(LED_STATUS, LOW);
 }
@@ -1905,26 +2123,26 @@ void reconnect() {
 
   if(!mqtt_server.equals("") && !mqtt_port.equals("") && !mqtt_topic.equals("")) {
 	  // Trying connect with broker.
-	  sSerial.printf("#Trying to connect MQTT %s:%s@%s:%s",mqtt_user.c_str(),mqtt_pass.c_str(),mqtt_server.c_str(),mqtt_port.c_str());
+	  Serial.printf("#Trying to connect MQTT %s:%s@%s:%s",mqtt_user.c_str(),mqtt_pass.c_str(),mqtt_server.c_str(),mqtt_port.c_str());
 	  wc = 0;
 	  while (!MQTT_CLIENT.connected() && wc++ < 5) {
 	    esp_task_wdt_reset();
 	    MQTT_CLIENT.connect(mqtt_id.c_str(),mqtt_user.c_str(),mqtt_pass.c_str()); 
 	    // Wait to try to reconnect again...
 	    delay(200);
-	    sSerial.print(".");
+	    Serial.print(".");
 	  }
 	
 	  if(wc < 5) {
-	    sSerial.println("Conected");
+	    Serial.println("Conected");
 	    MQTT_CLIENT.subscribe(mqtt_topic.c_str());
 	  }
 	  else
-	    sSerial.println("Abort");
+	    Serial.println("Abort");
   }
   else {
-      sSerial.println("#MQTT ignore test connect, no mqtt server, port, and topic information.\n");
-      sSerial.printf("mqtt server=%s, mqtt port=%s, mqtt topic=%s\n",mqtt_server.c_str(),mqtt_port.c_str(),mqtt_topic.c_str());
+      Serial.println("#MQTT ignore test connect, no mqtt server, port, and topic information.\n");
+      Serial.printf("mqtt server=%s, mqtt port=%s, mqtt topic=%s\n",mqtt_server.c_str(),mqtt_port.c_str(),mqtt_topic.c_str());
   }
 }
 
@@ -1939,15 +2157,15 @@ void enable_mqtt()
       mqtt_id += pwd_ch;
       ++pwd_c;
     } while (pwd_ch != '\000');    
-    sSerial.printf("EEPROM MQTT-ID=%s\r\n",mqtt_id.c_str());
+    Serial.printf("EEPROM MQTT-ID=%s\r\n",mqtt_id.c_str());
   }
   else {
     if (mqtt_id.isEmpty()) {
       mqtt_id = mqtt_iddf;
-      sSerial.printf("default MQTT-ID=%s\r\n",mqtt_id.c_str());    
+      Serial.printf("default MQTT-ID=%s\r\n",mqtt_id.c_str());    
     }
     else {
-      sSerial.printf("SDCard MQTT-ID=%s\r\n",mqtt_id.c_str());    
+      Serial.printf("SDCard MQTT-ID=%s\r\n",mqtt_id.c_str());    
     }
   }
 
@@ -1959,15 +2177,15 @@ void enable_mqtt()
       mqtt_server += pwd_ch;
       ++pwd_c;
     } while (pwd_ch != '\000');    
-    sSerial.printf("EEPROM MQTT-Server=%s\r\n",mqtt_server.c_str());
+    Serial.printf("EEPROM MQTT-Server=%s\r\n",mqtt_server.c_str());
   }
   else {
     if(mqtt_server.isEmpty()) {
       mqtt_server = mqtt_serverdf;
-      sSerial.printf("default MQTT-Server=%s\r\n",mqtt_server.c_str());
+      Serial.printf("default MQTT-Server=%s\r\n",mqtt_server.c_str());
     }
     else {
-      sSerial.printf("SDCard MQTT-Server=%s\r\n",mqtt_server.c_str());    
+      Serial.printf("SDCard MQTT-Server=%s\r\n",mqtt_server.c_str());    
     }
   }
 
@@ -1979,15 +2197,15 @@ void enable_mqtt()
       mqtt_port += pwd_ch;
       ++pwd_c;
     } while (pwd_ch != '\000');    
-    sSerial.printf("EEPROM MQTT-Port=%s\r\n",mqtt_port.c_str());
+    Serial.printf("EEPROM MQTT-Port=%s\r\n",mqtt_port.c_str());
   }
   else {
     if (mqtt_port.isEmpty()) {
       mqtt_port = mqtt_portdf;
-      sSerial.printf("default MQTT-Port=%s\r\n",mqtt_port.c_str());    
+      Serial.printf("default MQTT-Port=%s\r\n",mqtt_port.c_str());    
     }
     else {
-      sSerial.printf("SDCard MQTT-Port=%s\r\n",mqtt_port.c_str());    
+      Serial.printf("SDCard MQTT-Port=%s\r\n",mqtt_port.c_str());    
     }
   }
 
@@ -1999,15 +2217,15 @@ void enable_mqtt()
       mqtt_user += pwd_ch;
       ++pwd_c;
     } while (pwd_ch != '\000');    
-    sSerial.printf("EEPROM MQTT-User=%s\r\n",mqtt_user.c_str());
+    Serial.printf("EEPROM MQTT-User=%s\r\n",mqtt_user.c_str());
   }
   else {
     if (mqtt_user.isEmpty()) {
       mqtt_user = mqtt_userdf;
-      sSerial.printf("default MQTT-User=%s\r\n",mqtt_user.c_str());    
+      Serial.printf("default MQTT-User=%s\r\n",mqtt_user.c_str());    
     }
     else {
-      sSerial.printf("SDCard MQTT-User=%s\r\n",mqtt_user.c_str());    
+      Serial.printf("SDCard MQTT-User=%s\r\n",mqtt_user.c_str());    
     }
   }
 
@@ -2019,15 +2237,15 @@ void enable_mqtt()
       mqtt_pass += pwd_ch;
       ++pwd_c;
     } while (pwd_ch != '\000');    
-    sSerial.printf("EEPROM MQTT-Password=%s\r\n",mqtt_pass.c_str());
+    Serial.printf("EEPROM MQTT-Password=%s\r\n",mqtt_pass.c_str());
   }
   else {
     if (mqtt_pass.isEmpty()) {
       mqtt_pass = mqtt_passdf;
-      sSerial.printf("default MQTT-Password=%s\r\n",mqtt_pass.c_str());    
+      Serial.printf("default MQTT-Password=%s\r\n",mqtt_pass.c_str());    
     }
     else {
-      sSerial.printf("SDCard MQTT-Password=%s\r\n",mqtt_pass.c_str());    
+      Serial.printf("SDCard MQTT-Password=%s\r\n",mqtt_pass.c_str());    
     }
   }
 
@@ -2039,25 +2257,25 @@ void enable_mqtt()
       mqtt_topic += pwd_ch;
       ++pwd_c;
     } while (pwd_ch != '\000');    
-    sSerial.printf("EEPROM MQTT-Topic=%s\r\n",mqtt_topic.c_str());
+    Serial.printf("EEPROM MQTT-Topic=%s\r\n",mqtt_topic.c_str());
   }
   else {
     if (mqtt_topic.isEmpty()) {
       mqtt_topic = mqtt_topicdf;
-      sSerial.printf("default MQTT-Topic=%s\r\n",mqtt_topic.c_str());    
+      Serial.printf("default MQTT-Topic=%s\r\n",mqtt_topic.c_str());    
     }
     else {
-      sSerial.printf("SDCard MQTT-Topic=%s\r\n",mqtt_topic.c_str());    
+      Serial.printf("SDCard MQTT-Topic=%s\r\n",mqtt_topic.c_str());    
     }
   }
 
   if (EEPROM.read(__MQTT_PERIOD__) == 0xff && EEPROM.read(__MQTT_PERIOD__+1) == 0xff) {
     mqtt_stime = MQTT_TIME/1000;
-    sSerial.printf("default MQTT-PERIOD=%d s\r\n",mqtt_stime);    
+    Serial.printf("default MQTT-PERIOD=%d s\r\n",mqtt_stime);    
   }
   else {
     mqtt_stime = EEPROM.read(__MQTT_PERIOD__) + EEPROM.read(__MQTT_PERIOD__+1)*256;
-    sSerial.printf("EEPROM MQTT-PERIOD=%d s\r\n",mqtt_stime);    
+    Serial.printf("EEPROM MQTT-PERIOD=%d s\r\n",mqtt_stime);    
   }
 
 
@@ -2092,32 +2310,33 @@ void send_mqtt(char *wdata)
 	  sprintf(saveurl,"{\"mac\":\"%s\",\"data\":\"%s\",\"period\":\"%d\"}",mac.c_str(),strdata,mqtt_stime);
 	  String PayloadTest = "{ \"data\":\"test\" }";
 	  //mqtt_topic = "/jca/plug";
-	  sSerial.println("#Topic : "+mqtt_topic);
-	  sSerial.printf("#Payload (%d) : %s\r\n",strlen(saveurl),saveurl);
+	  Serial.println("#Topic : "+mqtt_topic);
+	  Serial.printf("#Payload (%d) : %s\r\n",strlen(saveurl),saveurl);
 	
 	  if (!MQTT_CLIENT.connected()) {
 	    reconnect();
 	  }
 	
 	  if (MQTT_CLIENT.publish(mqtt_topic.c_str(),saveurl)) {
-	    sSerial.println("#MQTT sent ok.\n");
+	    Serial.println("#MQTT sent ok.\n");
 	    sendsucc = 1;
 	  }
 	  else {
-	    sSerial.println("#MQTT sent failed.\n");
+	    Serial.println("#MQTT sent failed.\n");
 	  }
 	
 	  //MQTT_CLIENT.publish(mqtt_topic.c_str(),PayloadTest.c_str());
   }
   else {
-      sSerial.println("#MQTT ignore, no mqtt server, port, and topic information.\n");
-      sSerial.printf("mqtt server=%s, mqtt port=%s, mqtt topic=%s\n",mqtt_server.c_str(),mqtt_port.c_str(),mqtt_topic.c_str());
+      Serial.println("#MQTT ignore, no mqtt server, port, and topic information.\n");
+      Serial.printf("mqtt server=%s, mqtt port=%s, mqtt topic=%s\n",mqtt_server.c_str(),mqtt_port.c_str(),mqtt_topic.c_str());
   }
 }
 
 int inputRegisterRead(short unsigned int address)
 {
-  //sSerial.printf("#RTU at %d\n",address);
+  Serial.printf("#RTU at %d\n",address);
+  return address;
   if (address-MODBUSBASEADDR < MAXREGISTER_MODBUS)
     return rmodbus[address-MODBUSBASEADDR];
   else    
@@ -2129,37 +2348,37 @@ boolean readPMSdata(Stream *s)
   uint8_t buffer[32];    
   uint16_t sum = 0;
 
-  sSerial.println("PMS wait serial");
+  Serial.println("PMS wait serial");
   int fb;
   long cc = 0;
   do {
     fb = s->read();
-    //sSerial.printf("fb=%x\n",fb);
+    //Serial.printf("fb=%x\n",fb);
   } while (fb != 0x42 && ++cc < 2000000);
   if (cc >= 2000000) {
-    sSerial.println("PMS wait timeout");
+    Serial.println("PMS wait timeout");
     return false;
   }
   sum = fb;
   buffer[0] = fb;
-  //sSerial.print("Data[");
-  //sSerial.print(0);
-  //sSerial.print("] = ");
-  //sSerial.println(fb,HEX);
+  //Serial.print("Data[");
+  //Serial.print(0);
+  //Serial.print("] = ");
+  //Serial.println(fb,HEX);
 
   for (int j = 0; j < 31; ++j) {
     do {
       fb = s->read();
     } while (fb == -1);
-    //sSerial.print("Data[");
-    //sSerial.print(j+1);
-    //sSerial.print("] = ");
-    //sSerial.println(fb,HEX);
+    //Serial.print("Data[");
+    //Serial.print(j+1);
+    //Serial.print("] = ");
+    //Serial.println(fb,HEX);
     if (j < 29) sum += fb;
     buffer[j+1] = fb;
   }
-  sSerial.print("Sum = ");
-  sSerial.println((unsigned)(buffer[30]<<8)+buffer[31],HEX);
+  Serial.print("Sum = ");
+  Serial.println((unsigned)(buffer[30]<<8)+buffer[31],HEX);
 
   //swap value for library
   for (int i = 0; i < 16; ++i)
@@ -2169,15 +2388,15 @@ boolean readPMSdata(Stream *s)
     buffer[i*2+1] = t;
   }
   memcpy((void *)&pmsdata_realtime, (void *)buffer+2, 30);
-  sSerial.print("Lib = ");
-  sSerial.println(pmsdata.checksum,HEX);
+  Serial.print("Lib = ");
+  Serial.println(pmsdata.checksum,HEX);
 
   if ((unsigned)sum == (unsigned)pmsdata_realtime.checksum) {
     pmsdata = pmsdata_realtime;
     return true;    
   }
   else {
-    sSerial.println("Checksum failure");
+    Serial.println("Checksum failure");
     return false;    
   }
 
@@ -2191,3 +2410,449 @@ void pwm_out()
   //analogWrite(IOPIN5, outputpwm);      
 }
 
+void testdrawline() {
+  int16_t i;
+
+  display.clearDisplay(); // Clear display buffer
+
+  for(i=0; i<display.width(); i+=4) {
+    display.drawLine(0, 0, i, display.height()-1, SSD1306_WHITE);
+    display.display(); // Update screen with each newly-drawn line
+    delay(1);
+  }
+  for(i=0; i<display.height(); i+=4) {
+    display.drawLine(0, 0, display.width()-1, i, SSD1306_WHITE);
+    display.display();
+    delay(1);
+  }
+  delay(250);
+
+  display.clearDisplay();
+
+  for(i=0; i<display.width(); i+=4) {
+    display.drawLine(0, display.height()-1, i, 0, SSD1306_WHITE);
+    display.display();
+    delay(1);
+  }
+  for(i=display.height()-1; i>=0; i-=4) {
+    display.drawLine(0, display.height()-1, display.width()-1, i, SSD1306_WHITE);
+    display.display();
+    delay(1);
+  }
+  delay(250);
+
+  display.clearDisplay();
+
+  for(i=display.width()-1; i>=0; i-=4) {
+    display.drawLine(display.width()-1, display.height()-1, i, 0, SSD1306_WHITE);
+    display.display();
+    delay(1);
+  }
+  for(i=display.height()-1; i>=0; i-=4) {
+    display.drawLine(display.width()-1, display.height()-1, 0, i, SSD1306_WHITE);
+    display.display();
+    delay(1);
+  }
+  delay(250);
+
+  display.clearDisplay();
+
+  for(i=0; i<display.height(); i+=4) {
+    display.drawLine(display.width()-1, 0, 0, i, SSD1306_WHITE);
+    display.display();
+    delay(1);
+  }
+  for(i=0; i<display.width(); i+=4) {
+    display.drawLine(display.width()-1, 0, i, display.height()-1, SSD1306_WHITE);
+    display.display();
+    delay(1);
+  }
+
+  delay(2000); // Pause for 2 seconds
+}
+
+void testdrawrect(void) {
+  display.clearDisplay();
+
+  for(int16_t i=0; i<display.height()/2; i+=2) {
+    display.drawRect(i, i, display.width()-2*i, display.height()-2*i, SSD1306_WHITE);
+    display.display(); // Update screen with each newly-drawn rectangle
+    delay(1);
+  }
+
+  delay(2000);
+}
+
+void testfillrect(void) {
+  display.clearDisplay();
+
+  for(int16_t i=0; i<display.height()/2; i+=3) {
+    // The INVERSE color is used so rectangles alternate white/black
+    display.fillRect(i, i, display.width()-i*2, display.height()-i*2, SSD1306_INVERSE);
+    display.display(); // Update screen with each newly-drawn rectangle
+    delay(1);
+  }
+
+  delay(2000);
+}
+
+void testdrawcircle(void) {
+  display.clearDisplay();
+
+  for(int16_t i=0; i<max(display.width(),display.height())/2; i+=2) {
+    display.drawCircle(display.width()/2, display.height()/2, i, SSD1306_WHITE);
+    display.display();
+    delay(1);
+  }
+
+  delay(2000);
+}
+
+void testfillcircle(void) {
+  display.clearDisplay();
+
+  for(int16_t i=max(display.width(),display.height())/2; i>0; i-=3) {
+    // The INVERSE color is used so circles alternate white/black
+    display.fillCircle(display.width() / 2, display.height() / 2, i, SSD1306_INVERSE);
+    display.display(); // Update screen with each newly-drawn circle
+    delay(1);
+  }
+
+  delay(2000);
+}
+
+void testdrawroundrect(void) {
+  display.clearDisplay();
+
+  for(int16_t i=0; i<display.height()/2-2; i+=2) {
+    display.drawRoundRect(i, i, display.width()-2*i, display.height()-2*i,
+      display.height()/4, SSD1306_WHITE);
+    display.display();
+    delay(1);
+  }
+
+  delay(2000);
+}
+
+void testfillroundrect(void) {
+  display.clearDisplay();
+
+  for(int16_t i=0; i<display.height()/2-2; i+=2) {
+    // The INVERSE color is used so round-rects alternate white/black
+    display.fillRoundRect(i, i, display.width()-2*i, display.height()-2*i,
+      display.height()/4, SSD1306_INVERSE);
+    display.display();
+    delay(1);
+  }
+
+  delay(2000);
+}
+
+void testdrawtriangle(void) {
+  display.clearDisplay();
+
+  for(int16_t i=0; i<max(display.width(),display.height())/2; i+=5) {
+    display.drawTriangle(
+      display.width()/2  , display.height()/2-i,
+      display.width()/2-i, display.height()/2+i,
+      display.width()/2+i, display.height()/2+i, SSD1306_WHITE);
+    display.display();
+    delay(1);
+  }
+
+  delay(2000);
+}
+
+void testfilltriangle(void) {
+  display.clearDisplay();
+
+  for(int16_t i=max(display.width(),display.height())/2; i>0; i-=5) {
+    // The INVERSE color is used so triangles alternate white/black
+    display.fillTriangle(
+      display.width()/2  , display.height()/2-i,
+      display.width()/2-i, display.height()/2+i,
+      display.width()/2+i, display.height()/2+i, SSD1306_INVERSE);
+    display.display();
+    delay(1);
+  }
+
+  delay(2000);
+}
+
+void testdrawchar(void) {
+  display.clearDisplay();
+
+  display.setTextSize(1);      // Normal 1:1 pixel scale
+  display.setTextColor(SSD1306_WHITE); // Draw white text
+  display.setCursor(0, 0);     // Start at top-left corner
+  display.cp437(true);         // Use full 256 char 'Code Page 437' font
+
+  // Not all the characters will fit on the display. This is normal.
+  // Library will draw what it can and the rest will be clipped.
+  for(int16_t i=0; i<256; i++) {
+    if(i == '\n') display.write(' ');
+    else          display.write(i);
+  }
+
+  display.display();
+  delay(2000);
+}
+
+void testdrawstyles(void) {
+  display.clearDisplay();
+
+  display.setTextSize(1);             // Normal 1:1 pixel scale
+  display.setTextColor(SSD1306_WHITE);        // Draw white text
+  display.setCursor(0,0);             // Start at top-left corner
+  display.println(F("Hello, world!"));
+
+  display.setTextColor(SSD1306_BLACK, SSD1306_WHITE); // Draw 'inverse' text
+  display.println(3.141592);
+
+  display.setTextSize(2);             // Draw 2X-scale text
+  display.setTextColor(SSD1306_WHITE);
+  display.print(F("0x")); display.println(0xDEADBEEF, HEX);
+
+  display.display();
+  delay(2000);
+}
+
+void testscrolltext(void) {
+  display.clearDisplay();
+
+  display.setTextSize(2); // Draw 2X-scale text
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(10, 0);
+  display.println(F("scroll"));
+  display.display();      // Show initial text
+  delay(100);
+
+  // Scroll in various directions, pausing in-between:
+  display.startscrollright(0x00, 0x0F);
+  delay(2000);
+  display.stopscroll();
+  delay(1000);
+  display.startscrollleft(0x00, 0x0F);
+  delay(2000);
+  display.stopscroll();
+  delay(1000);
+  display.startscrolldiagright(0x00, 0x07);
+  delay(2000);
+  display.startscrolldiagleft(0x00, 0x07);
+  delay(2000);
+  display.stopscroll();
+  delay(1000);
+}
+
+void testdrawbitmap(void) {
+  display.clearDisplay();
+
+  display.drawBitmap(
+    (display.width()  - LOGO_WIDTH ) / 2,
+    (display.height() - LOGO_HEIGHT) / 2,
+    logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
+  display.display();
+  delay(1000);
+}
+
+#define XPOS   0 // Indexes into the 'icons' array in function below
+#define YPOS   1
+#define DELTAY 2
+
+void testanimate(const uint8_t *bitmap, uint8_t w, uint8_t h) {
+  int8_t f, icons[NUMFLAKES][3];
+
+  // Initialize 'snowflake' positions
+  for(f=0; f< NUMFLAKES; f++) {
+    icons[f][XPOS]   = random(1 - LOGO_WIDTH, display.width());
+    icons[f][YPOS]   = -LOGO_HEIGHT;
+    icons[f][DELTAY] = random(1, 6);
+    Serial.print(F("x: "));
+    Serial.print(icons[f][XPOS], DEC);
+    Serial.print(F(" y: "));
+    Serial.print(icons[f][YPOS], DEC);
+    Serial.print(F(" dy: "));
+    Serial.println(icons[f][DELTAY], DEC);
+  }
+
+  for(;;) { // Loop forever...
+    display.clearDisplay(); // Clear the display buffer
+
+    // Draw each snowflake:
+    for(f=0; f< NUMFLAKES; f++) {
+      display.drawBitmap(icons[f][XPOS], icons[f][YPOS], bitmap, w, h, SSD1306_WHITE);
+    }
+
+    display.display(); // Show the display buffer on the screen
+    delay(200);        // Pause for 1/10 second
+
+    // Then update coordinates of each flake...
+    for(f=0; f< NUMFLAKES; f++) {
+      icons[f][YPOS] += icons[f][DELTAY];
+      // If snowflake is off the bottom of the screen...
+      if (icons[f][YPOS] >= display.height()) {
+        // Reinitialize to a random position, just off the top
+        icons[f][XPOS]   = random(1 - LOGO_WIDTH, display.width());
+        icons[f][YPOS]   = -LOGO_HEIGHT;
+        icons[f][DELTAY] = random(1, 6);
+      }
+    }
+  }
+}
+
+void listDir(fs::FS &fs, const char * dirname, uint8_t levels){
+  Serial.printf("Listing directory: %s\n", dirname);
+
+  File root = fs.open(dirname);
+  if(!root){
+    Serial.println("Failed to open directory");
+    return;
+  }
+  if(!root.isDirectory()){
+    Serial.println("Not a directory");
+    return;
+  }
+
+  File file = root.openNextFile();
+  while(file){
+    if(file.isDirectory()){
+      Serial.print("  DIR : ");
+      Serial.println(file.name());
+      if(levels){
+        listDir(fs, file.name(), levels -1);
+      }
+    } else {
+      Serial.print("  FILE: ");
+      Serial.print(file.name());
+      Serial.print("  SIZE: ");
+      Serial.println(file.size());
+    }
+    file = root.openNextFile();
+  }
+}
+
+void createDir(fs::FS &fs, const char * path){
+  Serial.printf("Creating Dir: %s\n", path);
+  if(fs.mkdir(path)){
+    Serial.println("Dir created");
+  } else {
+    Serial.println("mkdir failed");
+  }
+}
+
+void removeDir(fs::FS &fs, const char * path){
+  Serial.printf("Removing Dir: %s\n", path);
+  if(fs.rmdir(path)){
+    Serial.println("Dir removed");
+  } else {
+    Serial.println("rmdir failed");
+  }
+}
+
+void readFile(fs::FS &fs, const char * path){
+  Serial.printf("Reading file: %s\n", path);
+
+  File file = fs.open(path);
+  if(!file){
+    Serial.println("Failed to open file for reading");
+    return;
+  }
+
+  Serial.print("Read from file: ");
+  while(file.available()){
+    Serial.write(file.read());
+  }
+  file.close();
+}
+
+void writeFile(fs::FS &fs, const char * path, const char * message){
+  Serial.printf("Writing file: %s\n", path);
+
+  File file = fs.open(path, FILE_WRITE);
+  if(!file){
+    Serial.println("Failed to open file for writing");
+    return;
+  }
+  if(file.print(message)){
+    Serial.println("File written");
+  } else {
+    Serial.println("Write failed");
+  }
+  file.close();
+}
+
+void appendFile(fs::FS &fs, const char * path, const char * message){
+  Serial.printf("Appending to file: %s\n", path);
+
+  File file = fs.open(path, FILE_APPEND);
+  if(!file){
+    Serial.println("Failed to open file for appending");
+    return;
+  }
+  if(file.print(message)){
+      Serial.println("Message appended");
+  } else {
+    Serial.println("Append failed");
+  }
+  file.close();
+}
+
+void renameFile(fs::FS &fs, const char * path1, const char * path2){
+  Serial.printf("Renaming file %s to %s\n", path1, path2);
+  if (fs.rename(path1, path2)) {
+    Serial.println("File renamed");
+  } else {
+    Serial.println("Rename failed");
+  }
+}
+
+void deleteFile(fs::FS &fs, const char * path){
+  Serial.printf("Deleting file: %s\n", path);
+  if(fs.remove(path)){
+    Serial.println("File deleted");
+  } else {
+    Serial.println("Delete failed");
+  }
+}
+
+void testFileIO(fs::FS &fs, const char * path){
+  File file = fs.open(path);
+  static uint8_t buf[512];
+  size_t len = 0;
+  uint32_t start = millis();
+  uint32_t end = start;
+  if(file){
+    len = file.size();
+    size_t flen = len;
+    start = millis();
+    while(len){
+      size_t toRead = len;
+      if(toRead > 512){
+        toRead = 512;
+      }
+      file.read(buf, toRead);
+      len -= toRead;
+    }
+    end = millis() - start;
+    Serial.printf("%u bytes read for %u ms\n", flen, end);
+    file.close();
+  } else {
+    Serial.println("Failed to open file for reading");
+  }
+
+
+  file = fs.open(path, FILE_WRITE);
+  if(!file){
+    Serial.println("Failed to open file for writing");
+    return;
+  }
+
+  size_t i;
+  start = millis();
+  for(i=0; i<2048; i++){
+    file.write(buf, 512);
+  }
+  end = millis() - start;
+  Serial.printf("%u bytes written for %u ms\n", 2048 * 512, end);
+  file.close();
+}
