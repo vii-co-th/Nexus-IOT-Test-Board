@@ -4,8 +4,6 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 
-#define test  0
-
 #define SW1 45
 #define SW2 46
 #define SW3 47
@@ -17,13 +15,13 @@
 #define TX0 37
 #define RX1 18
 #define TX1 17
-#define PMTX  19
-#define PMRX  20
+#define PMTX  20
+#define PMRX  12
 #define CO2TX 7
 #define CO2RX 12
 #define CTRX  38
 #define CTTX  39
-#define NTC 19
+#define NTC 9
 #define SDA 4
 #define SCL 3
 #define SDCS  10
@@ -59,7 +57,7 @@ void testFileIO(fs::FS &fs, const char * path);
 MHZ19E mhz19e;
 
 #include <OneWire.h>
-OneWire  ow(ONEWIRE);  // on pin 10 (a 4.7K resistor is necessary)
+//OneWire  ow(ONEWIRE);  // on pin 10 (a 4.7K resistor is necessary)
 
 //OLED
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
@@ -109,6 +107,24 @@ void testdrawstyles(void);
 void testscrolltext(void);
 void testdrawbitmap(void);
 void testanimate(const uint8_t *bitmap, uint8_t w, uint8_t h);
+
+//NTC
+#define THERMISTORPIN NTC
+// resistance at 25 degrees C
+#define THERMISTORNOMINAL 10000      
+// temp. for nominal resistance (almost always 25 C)
+#define TEMPERATURENOMINAL 25   
+// how many samples to take and average, more takes longer
+// but is more 'smooth'
+#define NUMSAMPLES 5
+// The beta coefficient of the thermistor (usually 3000-4000)
+#define BCOEFFICIENT 3425
+// the value of the 'other' resistor
+#define SERIESRESISTOR 10000    
+int samples[NUMSAMPLES];
+float steinhart;
+float average = 0;
+
 
 //MODBUS RTU
 #include <ModbusRTUSlave.h>
@@ -199,6 +215,9 @@ uint8_t dow;
 uint8_t finsleep = 0;
 
 long smilli = 0;
+uint8_t osdcd = 2;
+uint8_t orain = 2;
+uint8_t owind = 2;
 
 //SDCARD
 #include <FS.h>
@@ -221,10 +240,10 @@ String mqtt_user = "";
 String mqtt_pass = "";
 String mqtt_topic = "";
 String mqtt_iddf = "0001";
-String mqtt_serverdf = "20.212.32.41";
+String mqtt_serverdf = "iot.vii.co.th";
 String mqtt_portdf = "1883";
-String mqtt_userdf = "gw1";
-String mqtt_passdf = "gw1@1122";
+String mqtt_userdf = "jca";
+String mqtt_passdf = "jcalambda";
 String mqtt_topicdf = "/jca/aqs";
 
 char cmqtt_topic[100];
@@ -237,13 +256,6 @@ void send_mqtt(char *);
 void reconnect();
 void callback(char* topic, byte* payload, unsigned int length);
 void enable_mqtt();
-void write_mqttid_eeprom (char *s);
-void write_mqttserver_eeprom (char *s);
-void write_mqttport_eeprom (char *s);
-void write_mqttuser_eeprom (char *s);
-void write_mqttpass_eeprom (char *s);
-void write_mqtttopic_eeprom (char *s);
-void write_mqttperiod_eeprom (char *s);
 
 //WiFi
 #include <esp_wifi.h>
@@ -283,13 +295,6 @@ String mac6 = "";
 #define __DHCP_ADDR__     0x120
 #define __BAUD_RATE__     0x130
 #define __MQTT_PERIOD__   0x136
-//#define __DEBUG_ADDR__     0x122
-//#define __LIGHT_ADDR__     0x124
-//#define __BUZZER_ADDR__     0x126
-//#define __NUMP_ADDR__     0x128
-//#define __TEL1_ADDR__     0x130
-//#define __TEL2_ADDR__     0x13B
-//#define __TEL3_ADDR__     0x146
 #define __ADMINPASS_ADDR__     0x151
 #define __SERVER_ADDR__     0x170 //0x170-0x1BF
 #define __LOCK_ADDR__     0x1D0 
@@ -300,13 +305,6 @@ uint  mqtt_stime = 60;  //0 = disable
 #define VIP2  168
 #define VIP3  1
 #define VIP4  100
-//0x42,0x49,0x54,0xf3,0xab,0x9e
-#define VMAC1 0x42
-#define VMAC2 0x49
-#define VMAC3 0x54
-#define VMAC4 0xf3
-#define VMAC5 0xab
-#define VMAC6 0x9e
 HTTPClient http;
 WiFiMulti wifiMulti;
 uint8_t isWiFi = 0;
@@ -315,7 +313,7 @@ uint8_t isWiFi = 0;
 // SSID and PW for Config Portal
 char host[] = "nexusiot";
 String ssid = host + String(ESP_getChipId(), HEX).substring(String(ESP_getChipId(), HEX).length()-4);
-const char* password = "lambda1234";
+const char* password = "nexus1234";
 
 // SSID and PW for your Router
 String Router_SSID;
@@ -327,11 +325,6 @@ WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP);
 
 //declare function
-void write_wifipass_eeprom (char *s);
-void write_wifissid_eeprom (char *s);
-void write_station_eeprom (int addr, IPAddress data);
-void write_adminpass_eeprom (char *s);
-void write_server_eeprom (char *s);
 void send_web(const char *wdata, bool fallbacksms);
 String urlencode(String str);
 IPAddress myip(VIP1, VIP2, VIP3, VIP4); //ESP static ip
@@ -345,7 +338,7 @@ IPAddress apgw(192,168,4,1);
 IPAddress apsn(255,255,255,0);
 int wc = 0;
 byte isDHCP = 1;
-String remote_server = "www.lambda-nu.com";
+String remote_server = "iot.vii.co.th";
 String tel1 = "0811710428";
 String tel2 = "";
 String tel3 = "";
@@ -503,616 +496,26 @@ String style =
 "form{background:#fff;max-width:258px;margin:75px auto;padding:30px;border-radius:5px;text-align:center}"
 ".btn{background:#3498db;color:#fff;cursor:pointer}</style>";
 
-/*
- * Login page
- */
 
  const char* loginIndex1 = 
- "<form name='loginForm'>"
-    "<table width='20%' bgcolor='A09F9F' align='center'>"
-        "<tr>"
-            "<td colspan=2>"
-                "<center><font size=4><b>Duet Login Page</b></font></center>"
-                "<br>"
-            "</td>"
-            "<br>"
-            "<br>"
-        "</tr>"
-        "<td>Username:</td>"
-        "<td><input type='text' size=25 name='userid'><br></td>"
-        "</tr>"
-        "<br>"
-        "<br>"
-        "<tr>"
-            "<td>Password:</td>"
-            "<td><input type='Password' size=25 id='pwd' name='pwd'><br></td>"
-            "<br>"
-            "<br>"
-        "</tr>"
-        "<tr>"
-            "<td></td>"
-            "<td><input type='submit' onclick='check(this.form)' value='Login'> <input type='submit' onclick='check2(this.form)' value='Update FW.'></td>"
-        "</tr>"
-    "</table>"
-"</form>"
-"<script>"
-    "function check(form)"
-    "{"
-    "if(form.userid.value=='admin' && form.pwd.value=='";
-const char* loginIndex2 = "')"
-    "{"
-    "window.open('/cmd?netinfo=1&p=";
-const char* loginIndex3 =    "'+form.pwd.value)"
-    "}"
-    "else"
-    "{"
-    " alert('Error Password or Username')"
-    "}"
-    "}\n\n";
-
-const char* loginIndex4 =        "function check2(form)"
-    "{"
-    "if(form.userid.value=='admin' && form.pwd.value=='";
-const char* loginIndex5 = "')"
-    "{"
-    "window.open('/serverIndex')"
-    "}"
-    "else"
-    "{"
-    " alert('Error Password or Username')"
-    "}"
-    "}\n\n";
-
-const char* loginIndex6 = "</script>";
-
-/*
- * Server Index Page
- */
- 
-/* Server Index Page */
-String serverIndex2 = 
-"<script src='https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js'></script>"
-"<form method='POST' action='#' enctype='multipart/form-data' id='upload_form' style='width=640px;'>"
-"<h2>EsSesense Firmware Update<h2><br>"
-"</label>Select firmware file (duet.bin)<label><br>"
-"<input type='file' name='update' id='file' onchange='sub(this)' style=display:none>"
-"<label id='file-input' for='file'>   Choose file...</label>"
-"<input type='submit' class=btn value='Update'>"
-"<br><br>"
-"<div id='prg'></div>"
-"<br><div id='prgbar'><div id='bar'></div></div><br>"
-"<div id=\"rfid\" style=\"display:none;\"><input type=\"button\" value=\"Refresh (auto in 20s)\" onclick=\"window.open('/','_self')\"></div>"
-"</form>"
-"<script>"
-"function sub(obj){"
-"var fileName = obj.value.split('\\\\');"
-"document.getElementById('file-input').innerHTML = '   '+ fileName[fileName.length-1];"
-"};"
-"$('form').submit(function(e){"
-"e.preventDefault();"
-"var form = $('#upload_form')[0];"
-"var data = new FormData(form);"
-"$.ajax({"
-"url: '/update',"
-"type: 'POST',"
-"data: data,"
-"contentType: false,"
-"processData:false,"
-"xhr: function() {"
-"var xhr = new window.XMLHttpRequest();"
-"xhr.upload.addEventListener('progress', function(evt) {"
-"if (evt.lengthComputable) {"
-"var per = evt.loaded / evt.total;"
-"$('#prg').html('progress: ' + Math.round(per*100) + '%');"
-"$('#bar').css('width',Math.round(per*100) + '%');"
-"if (Math.round(per*100) >= 100) { document.getElementById('rfid').style.display = 'block'; "
-"setTimeout(function(){ window.open('/','_self'); }, 20000);"
-"}"
-"}"
-"}, false);"
-"return xhr;"
-"},"
-"success:function(d, s) {"
-"console.log('success!'); "
-"},"
-"error: function (a, b, c) {"
-"}"
-"});"
-"});"
-"</script>" + style;
+ "<html><head><title>Hello</title></head><body>"
+ "Hello, it works. :D Please write your own web page!!"
+ "</body></html>";
 
 void handleCMD()
 {
-  //char html[200];
-  uint8_t dd;
-  uint8_t dm2;
-  uint8_t dy;
-  uint8_t hh;
-  uint8_t mm;
-  uint8_t ss;
-
-  finsleep = 0;
 
   sprintf(shtml,"<br><br>");
   
   if (server.hasArg("restart") && server.arg("restart") == "1") {
     sprintf(html,"Restart...<script>setTimeout(function(){ window.open('/','_self'); }, 5000);</script>");
-  } else
-  if (server.hasArg("wifissid") && server.hasArg("wifipass") && server.hasArg("p") && !strcmp(server.arg("p").c_str(),adminpassword.c_str())) {
-    wifissid = server.arg("wifissid");
-    write_wifissid_eeprom((char *)wifissid.c_str());
-    wifipassword = server.arg("wifipass");
-    write_wifipass_eeprom((char *)wifipassword.c_str());
-    sprintf(shtml,"WiFi SSID = %s<br>WiFi Password = %s<br><br>",wifissid.c_str(),wifipassword.c_str());
-  } else
-  if (server.hasArg("adminpass") && server.hasArg("p") && !strcmp(server.arg("p").c_str(),adminpassword.c_str())) {
-    adminpassword = server.arg("adminpass");
-    write_adminpass_eeprom((char *)adminpassword.c_str());
-    sprintf(shtml,"Admin Password = %s<br><br>",adminpassword.c_str());
-  } else
-  if (server.hasArg("remote_server") && server.hasArg("p") && !strcmp(server.arg("p").c_str(),adminpassword.c_str())) {
-    if(!strcmp(server.arg("remote_server").c_str(),"default")) {
-      remote_server = "www.lambda-nu.com";
-    }
-    else {
-      remote_server = server.arg("remote_server");
-    }
-    write_server_eeprom((char *)remote_server.c_str());
-    sprintf(shtml,"Remote Server = %s<br><br>",server.arg("remote_server").c_str());
-  } else
-  if (server.hasArg("wifissid") && server.hasArg("p") && !strcmp(server.arg("p").c_str(),adminpassword.c_str())) {
-    wifissid = server.arg("wifissid");
-    write_wifissid_eeprom((char *)wifissid.c_str());
-    sprintf(shtml,"WiFi SSID = %s<br><br>",wifissid.c_str());
-  } else
-  if (server.hasArg("wifipass") && server.hasArg("p") && !strcmp(server.arg("p").c_str(),adminpassword.c_str())) {
-    wifipassword = server.arg("wifipass");
-    write_wifipass_eeprom((char *)wifipassword.c_str());
-    sprintf(shtml,"WiFi Password = %s<br><br>",wifipassword.c_str());
-  } else
-  if (server.hasArg("dhcp") && server.hasArg("p") && !strcmp(server.arg("p").c_str(),adminpassword.c_str())) {
-    isDHCP = atoi(server.arg("dhcp").c_str());
-    if (isDHCP > 1 || isDHCP < 0) isDHCP = 1;
-    EEPROM.write(__DHCP_ADDR__,isDHCP);
-    EEPROM.commit();
-    sprintf(shtml,"DHCP = %s<br><br>",isDHCP==1?"Yes":"No");
-  } else
-  if (server.hasArg("ip") && server.hasArg("p") && !strcmp(server.arg("p").c_str(),adminpassword.c_str())) {
-    String data = server.arg("ip");
-    const char *dat = data.c_str();
-    char delimiter[] = ".";
-    char* ptr = strtok((char *)dat, delimiter);
-    int c = 0;
-    uint8_t ips[4];
-    while(ptr != NULL && c < 4) {
-        ips[c++] =  atoi(ptr);
-        //Serial.printf("data: %s (%d)\n", ptr, ips[c-1]);
-        ptr = strtok(NULL, delimiter);
-    }
-    if (c == 4 && ptr == NULL) {
-      myip[0] = ips[0];
-      myip[1] = ips[1];
-      myip[2] = ips[2];
-      myip[3] = ips[3];
-      write_station_eeprom(__IP_ADDR__,myip);
-      sprintf(shtml,"IP = %d.%d.%d.%d<br><br>",
-        myip[0],myip[1],myip[2],myip[3]
-      );
-    }
-    else {
-      sprintf(shtml,"invalid IP (%s)<br><br>",server.arg("ip").c_str());
-    }
-  } else
-  if (server.hasArg("sn") && server.hasArg("p") && !strcmp(server.arg("p").c_str(),adminpassword.c_str())) {
-    String data = server.arg("sn");
-    const char *dat = data.c_str();
-    char delimiter[] = ".";
-    char* ptr = strtok((char *)dat, delimiter);
-    int c = 0;
-    uint8_t ips[4];
-    while(ptr != NULL && c < 4) {
-        ips[c++] =  atoi(ptr);
-        //Serial.printf("data: %s (%d)\n", ptr, ips[c-1]);
-        ptr = strtok(NULL, delimiter);
-    }
-    if (c == 4 && ptr == NULL) {
-      mysn[0] = ips[0];
-      mysn[1] = ips[1];
-      mysn[2] = ips[2];
-      mysn[3] = ips[3];
-      write_station_eeprom(__SN_ADDR__,mysn);
-      sprintf(shtml,"Sub Netmask = %d.%d.%d.%d<br><br>",
-        mysn[0],mysn[1],mysn[2],mysn[3]
-      );
-    }
-    else {
-      sprintf(shtml,"invalid Sub Netmask (%s)<br><br>",server.arg("sn").c_str());
-    }
-  } else
-  if (server.hasArg("gw") && server.hasArg("p") && !strcmp(server.arg("p").c_str(),adminpassword.c_str())) {
-    String data = server.arg("gw");
-    const char *dat = data.c_str();
-    char delimiter[] = ".";
-    char* ptr = strtok((char *)dat, delimiter);
-    int c = 0;
-    uint8_t ips[4];
-    while(ptr != NULL && c < 4) {
-        ips[c++] =  atoi(ptr);
-        //Serial.printf("data: %s (%d)\n", ptr, ips[c-1]);
-        ptr = strtok(NULL, delimiter);
-    }
-    if (c == 4 && ptr == NULL) {
-      mygw[0] = ips[0];
-      mygw[1] = ips[1];
-      mygw[2] = ips[2];
-      mygw[3] = ips[3];
-      write_station_eeprom(__GW_ADDR__,mygw);
-      sprintf(shtml,"Gateway IP = %d.%d.%d.%d<br><br>",
-        mygw[0],mygw[1],mygw[2],mygw[3]
-      );
-    }
-    else {
-      sprintf(shtml,"invalid Gateway IP (%s)<br><br>",server.arg("gw").c_str());
-    }
-  } else
-  if (server.hasArg("dns") && server.hasArg("p") && !strcmp(server.arg("p").c_str(),adminpassword.c_str())) {
-    String data = server.arg("dns");
-    const char *dat = data.c_str();
-    char delimiter[] = ".";
-    char* ptr = strtok((char *)dat, delimiter);
-    int c = 0;
-    uint8_t ips[4];
-    while(ptr != NULL && c < 4) {
-        ips[c++] =  atoi(ptr);
-        //Serial.printf("data: %s (%d)\n", ptr, ips[c-1]);
-        ptr = strtok(NULL, delimiter);
-    }
-    if (c == 4 && ptr == NULL) {
-      mydns[0] = ips[0];
-      mydns[1] = ips[1];
-      mydns[2] = ips[2];
-      mydns[3] = ips[3];
-      write_station_eeprom(__DNS_ADDR__,mydns);
-      sprintf(shtml,"DNS IP = %d.%d.%d.%d<br><br>",
-        mydns[0],mydns[1],mydns[2],mydns[3]
-      );
-    }
-    else {
-      sprintf(shtml,"invalid DNS (%s)<br><br>",server.arg("dns").c_str());
-    }
-  } else
-  if (server.hasArg("sleep") && server.hasArg("p") && !strcmp(server.arg("p").c_str(),adminpassword.c_str())) {
-    finsleep = atoi(server.arg("sleep").c_str());
-    if(finsleep == 1) {
-      isWiFi = 0;
-      sprintf(shtml,"Setup Finished<br><br>");
-    }
-  } else
-  if (server.hasArg("dt") && server.hasArg("tm")) {
-    if (server.arg("dt").length() == 10 && server.arg("tm").length() == 8) {
-      dd = atoi(server.arg("dt").substring(8,10).c_str());
-      dm2 = atoi(server.arg("dt").substring(5,7).c_str());
-      dy = atoi(server.arg("dt").substring(2,4).c_str());
-      dD = dd; dM = dm2; dY = dy;
-      //rtc_setdate();
-      hh = atoi(server.arg("tm").substring(0,2).c_str());
-      mm = atoi(server.arg("tm").substring(3,5).c_str());
-      ss = atoi(server.arg("tm").substring(6,8).c_str());
-      dh = hh; dm = mm; ds = ss;
-      //rtc_settime();
-      //rtc_getdatetime();
-      sprintf(shtml,"Request Set Date Time = %02d/%02d/%04d %02d:%02d:%02d<br>Current Date Time = %02d/%02d/%04d %02d:%02d:%02d",dd,dm2,dy+2000,hh,mm,ss,dD,dM,2000+dY,dh,dm,ds);
-    }
-    else {
-      sprintf(shtml,"invalid format, plese Usage http://x.x.x.x/cmd?dt=yyyy-mm-dd&tm=hh:mm:ss");
-    }
-  } else
-  if (server.hasArg("setdate")) {
-    if (server.arg("setdate").length() == 6 || server.arg("setdate").length() == 7) {
-      dd = atoi(server.arg("setdate").substring(0,2).c_str());
-      dm2 = atoi(server.arg("setdate").substring(2,4).c_str());
-      dy = atoi(server.arg("setdate").substring(4,6).c_str());
-      dD = dd; dM = dm2; dY = dy;
-      //rtc_setdate();
-      if(server.arg("setdate").length() >= 7) {
-        dow = atoi(server.arg("setdate").substring(6,7).c_str());
-        //rtc_setdow();
-      }
-      //rtc_getdatetime();
-      sprintf(shtml,"Request Set Date = %02d/%02d/%04d<br>Current Date=%02d/%02d/%04d",dd,dm2,dy+2000,dD,dM,2000+dY);
-    }
-    else {
-      sprintf(shtml," or Usage http://x.x.x.x/cmd?setdate=DDMMYY[DOW] (your value = %s)<br>Ex. 11/01/2021 Monday = 1101212<br>Sun = 1, Mon = 2, ... Sat = 7",server.arg("setdate").c_str());
-    }
-  } else
-  if (server.hasArg("settime")) {
-    if (server.arg("settime").length() == 6) {
-      hh = atoi(server.arg("settime").substring(0,2).c_str());
-      mm = atoi(server.arg("settime").substring(2,4).c_str());
-      ss = atoi(server.arg("settime").substring(4,6).c_str());
-      dh = hh; dm = mm; ds = ss;
-      //rtc_settime();
-      //rtc_getdatetime();
-      sprintf(shtml,"Request Set Time = %02d:%02d:%02d<br>Current Time=%02d:%02d:%02d",hh,mm,ss,dh,dm,ds);
-    }
-    else {
-      sprintf(shtml,"Error Usage http://x.x.x.x/cmd?settime=HHMMSS (your value = %s)",server.arg("settime").c_str());
-    }
-  } else
-  if (server.hasArg("upmqtt") && server.hasArg("p") && !strcmp(server.arg("p").c_str(),adminpassword.c_str())) {
-    mqtt_id = server.arg("m1");
-    mqtt_server = server.arg("m2");
-    mqtt_port = server.arg("m3");
-    mqtt_user = server.arg("m4");
-    mqtt_pass = server.arg("m5");
-    mqtt_topic = server.arg("m6");
-    write_mqttid_eeprom((char *)mqtt_id.c_str());
-    write_mqttserver_eeprom((char *)mqtt_server.c_str());
-    write_mqttport_eeprom((char *)mqtt_port.c_str());
-    write_mqttuser_eeprom((char *)mqtt_user.c_str());
-    write_mqttpass_eeprom((char *)mqtt_pass.c_str());
-    write_mqtttopic_eeprom((char *)mqtt_topic.c_str());
-    sprintf(shtml,"MQTT ID = %s<br>MQTT Server = %s<br>MQTT Port = %s<br>MQTT User = %s<br>MQTT Password = %s<br>MQTT Topic = %s<br><br>",
-      mqtt_id.c_str(),
-      mqtt_server.c_str(),
-      mqtt_port.c_str(),
-      mqtt_user.c_str(),
-      mqtt_pass.c_str(),
-      mqtt_topic.c_str()
-    );
-  } else
-  if (server.hasArg("m1") && server.hasArg("p") && !strcmp(server.arg("p").c_str(),adminpassword.c_str())) {
-    mqtt_id = server.arg("m1");
-    write_mqttid_eeprom((char *)mqtt_id.c_str());
-    sprintf(shtml,"MQTT ID = %s<br><br>",
-      mqtt_id.c_str()
-    );
-  } else
-  if (server.hasArg("m2") && server.hasArg("p") && !strcmp(server.arg("p").c_str(),adminpassword.c_str())) {
-    mqtt_server = server.arg("m2");
-    write_mqttserver_eeprom((char *)mqtt_server.c_str());
-    sprintf(shtml,"MQTT Server = %s<br><br>",
-      mqtt_server.c_str()
-    );
-  } else
-  if (server.hasArg("m3") && server.hasArg("p") && !strcmp(server.arg("p").c_str(),adminpassword.c_str())) {
-    mqtt_port = server.arg("m3");
-    write_mqttport_eeprom((char *)mqtt_port.c_str());
-    sprintf(shtml,"MQTT User = %s<br><br>",
-      mqtt_port.c_str()
-    );
-  } else
-  if (server.hasArg("m4") && server.hasArg("p") && !strcmp(server.arg("p").c_str(),adminpassword.c_str())) {
-    mqtt_user = server.arg("m4");
-    write_mqttuser_eeprom((char *)mqtt_user.c_str());
-    sprintf(shtml,"MQTT User = %s<br><br>",
-      mqtt_user.c_str()
-    );
-  } else
-  if (server.hasArg("m5") && server.hasArg("p") && !strcmp(server.arg("p").c_str(),adminpassword.c_str())) {
-    mqtt_pass = server.arg("m5");
-    write_mqttpass_eeprom((char *)mqtt_pass.c_str());
-    sprintf(shtml,"MQTT Password = %s<br>",
-      mqtt_pass.c_str()
-    );
-  } else
-  if (server.hasArg("m6") && server.hasArg("p") && !strcmp(server.arg("p").c_str(),adminpassword.c_str())) {
-    mqtt_topic = server.arg("m6");
-    write_mqtttopic_eeprom((char *)mqtt_topic.c_str());
-    sprintf(shtml,"MQTT Topic = %s<br><br>",
-      mqtt_topic.c_str()
-    );
-  } else
-  if (server.hasArg("netinfo")) {
-    strcpy(shtml,"");
   }
   else {
     strcpy(html,"unknown cmd");
   }
 
-  //Serial.printf("p=%s, adminpassword=%s, p=adminpassword-->%d, server.arg(\"p\").equals(adminpassword)-->%d\r\n",server.arg("p").c_str(),adminpassword.c_str(),!strcmp(server.arg("p").c_str(),adminpassword.c_str()),server.arg("p").equals(adminpassword));
-  if (server.hasArg("netinfo") || server.hasArg("ip") || server.hasArg("sn") || server.hasArg("gw") || 
-      server.hasArg("dns") || server.hasArg("wifissid") || server.hasArg("wifipass") ||
-      server.hasArg("dhcp") || server.hasArg("adminpass") ||
-      server.hasArg("setdate") || server.hasArg("settime") || server.hasArg("remote_server") ||
-      server.hasArg("sleep") || server.hasArg("dt") || server.hasArg("tm") ||
-      server.hasArg("m1") || server.hasArg("m2") || server.hasArg("m3") || server.hasArg("m4") || 
-      server.hasArg("m5") || server.hasArg("m6") || server.hasArg("upmqtt")
-      ) {
+  sprintf(html,"%s",shtml);
 
-    if (server.hasArg("p") && !strcmp(server.arg("p").c_str(),adminpassword.c_str())) {
-      sprintf(html,
-      "<html><head><title>Duet Configuration</title>"
-      "<link rel=\"stylesheet\" href=\"http://www.lambda-nu.com/betheme/css//global.css\">"
-      "<link rel=\"stylesheet\" href=\"http://www.lambda-nu.com/betheme/css/structure.css\">"
-      "<link rel=\"stylesheet\" href=\"http://www.lambda-nu.com/betheme/css/be_style.css\">"
-      "<link rel=\"stylesheet\" href=\"http://www.lambda-nu.com/betheme/css/custom.css\">"
-      "<style>"
-      "input[type=\"button\"]{ padding: 5 10; }"
-      "</style>"
-      "</head><body>"
-      "<span id=\"headpage\">"
-      "&nbsp;&nbsp;<h3>Lambda Nu Duet</h3>"
-      "&nbsp;&nbsp;%s"
-      "</span>"
-      "<div class=\"jq-tabs tabs_wrapper tabs_vertical ui-tabs ui-widget ui-widget-content ui-corner-all\">"
-      "<ul class=\"ui-tabs-nav ui-helper-reset ui-helper-clearfix ui-widget-header ui-corner-all\" style=\"width: 200px;\">"
-      "		<li class=\"ui-state-default ui-corner-top ui-tabs-active ui-state-active\" tabindex=\"0\" id=\"l1\" onclick=\"ctab('1');\">"
-      "       <a class=\"ui-tabs-anchor\" href=\"#-1\" id=\"ui-id-4\" tabindex=\"-1\">Config Network</a>"
-      "   </li>"
-      "   <li class=\"ui-state-default ui-corner-top\" tabindex=\"-1\" id=\"l2\" onclick=\"ctab('2');\">"
-      "       <a class=\"ui-tabs-anchor\" href=\"#-2\" id=\"ui-id-5\" tabindex=\"-1\">Config Option</a>"
-      "   </li>" 
-      "   <li class=\"ui-state-default ui-corner-top\" tabindex=\"-1\" id=\"l3\" onclick=\"ctab('3');\">"
-      "       <a class=\"ui-tabs-anchor\" href=\"#-3\" id=\"ui-id-5\" tabindex=\"-1\">Config MQTT</a>"
-      "   </li>" 
-      " </ul>" 
-      "    <div class=\"ui-tabs-panel ui-widget-content ui-corner-bottom\" id=\"-1\" style=\"display: block;\">"
-      "<div class=\"row\">"
-      " <div class=\"column one-second\" style=\"margin-bottom: 0px;\">"
-      "Current IP = %d.%d.%d.%d (%s)<br>\n"
-      "Manual IP = %d.%d.%d.%d<br>\n"
-      "Sub Netmask = %d.%d.%d.%d<br>\n"  
-      "Gateway = %d.%d.%d.%d<br>\n"
-      "DNS = %d.%d.%d.%d<br><br>\n"
-      "WiFi SSID = %s<br>WiFi Password = %s<br><br>\n"
-      "AP SSID = %s<br>AP Password = %s<br>AP IP = %d.%d.%d.%d<br><br>\n"
-      "Remote Server = %s<br><br>\n"
-      "Admin Password = %s<br><br>\n"
-      "Remote Server <input id='remote_server' maxlength=64> <input type=button value=\" Update \" onclick=\"window.open('/cmd?tab=1&p=%s&remote_server='+document.getElementById('remote_server').value,'_self');\">"
-      " </div>"
-      " <div class=\"column one-second\" style=\"margin-bottom: 0px;\">"
-      "<input type=checkbox id=dhcp value=1 %s> Use DHCP <input type=button value=\"   OK   \" onclick=\"window.open(document.getElementById('dhcp').checked?'/cmd?p=%s&dhcp=1':'/cmd?tab=1&p=admin&dhcp=0','_self');\"><br><br>"
-      "<div class=\"row\"><div class=\"column\" style=\"margin-bottom:0px; padding-left:14px;\">IP </div><div class=\"column\" style=\"margin-bottom:0px;\"><input id='ip'> <input type=button value=\" Update \" onclick=\"window.open('/cmd?tab=1&p=%s&ip='+document.getElementById('ip').value,'_self');\"></div></div>\n"
-      "<div class=\"row\"><div class=\"column\" style=\"margin-bottom:0px; padding-left:9px;\">SN </div><div class=\"column\" style=\"margin-bottom:0px;\"><input id='sn'> <input type=button value=\" Update \" onclick=\"window.open('/cmd?tab=1&p=%s&sn='+document.getElementById('sn').value,'_self');\"></div></div>\n"
-      "<div class=\"row\"><div class=\"column\" style=\"margin-bottom:0px; padding-left:5px;\">GW </div><div class=\"column\" style=\"margin-bottom:0px;\"><input id='gw'> <input type=button value=\" Update \" onclick=\"window.open('/cmd?tab=1&p=%s&gw='+document.getElementById('gw').value,'_self');\"></div></div>\n"
-      "<div class=\"row\"><div class=\"column\" style=\"margin-bottom:0px; padding-left:0px;\">DNS </div><div class=\"column\" style=\"margin-bottom:0px;\"><input id='dns'> <input type=button value=\" Update \" onclick=\"window.open('/cmd?tab=1&p=%s&dns='+document.getElementById('dns').value,'_self');\"></div></div>\n"
-      "<br>"
-      "<div class=\"row\"><div class=\"column\" style=\"margin-bottom:0px; padding-left:25px;\">WiFi SSID </div><div class=\"column\" style=\"margin-bottom:0px;\"><input id='wifissid' maxlength=32 value='%s'> <input type=button value=\" Update \" onclick=\"window.open('/cmd?tab=1&p=%s&wifissid='+document.getElementById('wifissid').value,'_self');\"></div></div>"
-      "<div class=\"row\"><div class=\"column\" style=\"margin-bottom:0px; padding-left:0px;\">WiFi Password </div><div class=\"column\" style=\"margin-bottom:0px;\"><input id='wifipass' maxlength=32  value='%s'> <input type=button value=\" Update \" onclick=\"window.open('/cmd?tab=1&p=%s&wifipass='+document.getElementById('wifipass').value,'_self');\"></div></div>"
-      "<input type=button value=\" Update Both \" style=\"margin-left: 63px;\" onclick=\"window.open('/cmd?tab=1&p=%s&wifissid='+document.getElementById('wifissid').value+'&wifipass='+document.getElementById('wifipass').value,'_self');\"><br>"
-      " </div>"
-      "</div>"
-      "    </div>" 
-      "    <div class=\"ui-tabs-panel ui-widget-content ui-corner-bottom\" id=\"-2\" style=\"display: none;\">"
-      "     <div class=\"row\">"
-      "       <div class=\"column one\" style=\"margin-bottom: 0px;\">"
-      "        Date <input type=\"date\" value=\"20%02d-%02d-%02d\" id=dt style=\"display: inline-block; margin-left: 5px;\">"
-      "        <span style=\"margin-left: 10px;\">Time</span> <input type=\"time\" value=\"%02d:%02d:%02d\" id=tm style=\"display: inline-block; margin-left: 5px;\">"
-      "        <input type=\"button\" type=button value=\" Update \" onclick=\"window.open('/cmd?tab=2&p=%s&dt='+document.getElementById('dt').value+'&tm='+document.getElementById('tm').value+(document.getElementById('tm').value.length<8?':00':''),'_self');\" style=\"display: inline-block; margin-left: 10px;;\">"
-      "        <br><br>"
-      "       </div>"
-      "     </div>"
-      "    </div>"
-      "    <div class=\"ui-tabs-panel ui-widget-content ui-corner-bottom\" id=\"-3\" style=\"display: none;\">"
-      "     <div class=\"row\">"
-      "       <div class=\"column one\" style=\"margin-bottom: 0px;\">"
-      "         <div class=\"row\"><div class=\"column\" style=\"margin-bottom:0px; padding-left:47px;\">MQTT Server ID </div><div class=\"column\" style=\"margin-bottom:0px;\"><input id='m1' maxlength=10 value='%s'> <input type=button value=\" Update \" onclick=\"window.open('/cmd?tab=3&p=%s&m1='+document.getElementById('m1').value,'_self');\"></div></div>"
-      "         <div class=\"row\"><div class=\"column\" style=\"margin-bottom:0px; padding-left:0px;\">MQTT Server Hostname </div><div class=\"column\" style=\"margin-bottom:0px;\"><input id='m2' maxlength=30 value='%s'> <input type=button value=\" Update \" onclick=\"window.open('/cmd?tab=3&p=%s&m2='+document.getElementById('m2').value,'_self');\"></div></div>"
-      "         <div class=\"row\"><div class=\"column\" style=\"margin-bottom:0px; padding-left:35px;\">MQTT Server Port </div><div class=\"column\" style=\"margin-bottom:0px;\"><input id='m3' maxlength=6 value='%s'> <input type=button value=\" Update \" onclick=\"window.open('/cmd?tab=3&p=%s&m3='+document.getElementById('m3').value,'_self');\"></div></div>"
-      "         <div class=\"row\"><div class=\"column\" style=\"margin-bottom:0px; padding-left:30px;\">MQTT Server User </div><div class=\"column\" style=\"margin-bottom:0px;\"><input id='m4' maxlength=15 value='%s'> <input type=button value=\" Update \" onclick=\"window.open('/cmd?tab=3&p=%s&m4='+document.getElementById('m4').value,'_self');\"></div></div>"
-      "         <div class=\"row\"><div class=\"column\" style=\"margin-bottom:0px; padding-left:0px;\">MQTT Server Password </div><div class=\"column\" style=\"margin-bottom:0px;\"><input id='m5' maxlength=15 value='%s'> <input type=button value=\" Update \" onclick=\"window.open('/cmd?tab=3&p=%s&m5='+document.getElementById('m5').value,'_self');\"></div></div>"
-      "         <div class=\"row\"><div class=\"column\" style=\"margin-bottom:0px; padding-left:25px;\">MQTT Server Topic </div><div class=\"column\" style=\"margin-bottom:0px;\"><input id='m6' maxlength=60 value='%s'> <input type=button value=\" Update \" onclick=\"window.open('/cmd?tab=3&p=%s&m6='+document.getElementById('m6').value,'_self');\"></div></div>"
-      "         <input type=button value=\" Update All \" style=\"margin-left: 165px;\" onclick=\"window.open('/cmd?tab=3&p=%s&upmqtt=1&m1='+document.getElementById('m1').value+'&m2='+document.getElementById('m2').value+'&m3='+document.getElementById('m3').value+'&m4='+document.getElementById('m4').value+'&m5='+document.getElementById('m5').value+'&m6='+document.getElementById('m6').value,'_self');\"><br>"
-      "       </div>"
-      "     </div>"
-      "    </div>"
-      "</div>"
-      "<br>"
-      "<div class=\"row\">"
-      " <div class=\"column one\" style=\"padding-left: 200px;\">"
-      "<input type=button value=\"  Refresh  \" onclick=\"window.open('/cmd?tab=1&p=%s&netinfo=1','_self');\"> <input type=button value=\"  Finish Setup  \" onclick=\"window.open('/cmd?tab=1&p=%s&sleep=1','_self');\"><br><br>"
-      " </div>"
-      "</div>"
-      "<div class=\"row\">"
-      " <div class=\"column one\" style=\"padding-left: 5px;\">"
-      "MAC: %s<br>"
-      "FW Ver. 1.22.06.17"
-      " </div>"
-      "</div>"
-      "<script>"
-      "	function ctab(tab)\n"
-      "	{\n"
-      "		l1 = document.getElementById('l1');\n"
-      "		l2 = document.getElementById('l2');\n"
-      "		l3 = document.getElementById('l3');\n"
-      "		t1 = document.getElementById('-1');\n"
-      "		t2 = document.getElementById('-2');\n"
-      "		t3 = document.getElementById('-3');\n"
-      "		l1.classList.remove('ui-tabs-active');\n"
-      "		l1.classList.remove('ui-state-active');\n"
-      "		l2.classList.remove('ui-tabs-active');\n"
-      "		l2.classList.remove('ui-state-active');\n"
-      "		l3.classList.remove('ui-tabs-active');\n"
-      "		l3.classList.remove('ui-state-active');\n"
-      "		t1.style.display = 'none';\n"
-      "		t2.style.display = 'none';\n"
-      "		t3.style.display = 'none';\n"
-      "		if(tab=='1') {\n"
-      "			l1.classList.toggle('ui-tabs-active');\n"
-      "			l1.classList.toggle('ui-state-active');\n"
-      "			t1.style.display = 'block';\n"
-      "     window.scrollTo(0, 0);\n"
-      "		}\n"
-      "		if(tab=='2') {\n"
-      "			l2.classList.toggle('ui-tabs-active');\n"
-      "			l2.classList.toggle('ui-state-active');\n"
-      "			t2.style.display = 'block';\n"
-      "     window.scrollTo(0, 0);\n"
-      "		}"
-      "		if(tab=='3') {\n"
-      "			l3.classList.toggle('ui-tabs-active');\n"
-      "			l3.classList.toggle('ui-state-active');\n"
-      "			t3.style.display = 'block';\n"
-      "     window.scrollTo(0, 0);\n"
-      "		}\n"
-      "	}\n"
-      "window.onload = function(){\n"
-      " queryString = window.location.search;\n"
-      " const urlParams = new URLSearchParams(queryString);\n"
-      " const tab = urlParams.get('tab');\n"
-      " if (tab == '1' || tab == '2' || tab == '3') {\n"
-      "   ctab(tab);\n"
-      " }\n"
-      "};\n"
-      "</script>\n"
-      "</body></html>\n",
-        shtml, WiFi.localIP()[0],WiFi.localIP()[1],WiFi.localIP()[2],WiFi.localIP()[3],isDHCP==1?"DHCP":"Manual",
-        myip[0],myip[1],myip[2],myip[3],
-        mysn[0],mysn[1],mysn[2],mysn[3],
-        mygw[0],mygw[1],mygw[2],mygw[3],
-        mydns[0],mydns[1],mydns[2],mydns[3],
-        wifissid.c_str(), wifipassword.c_str(),
-        ssid.c_str(), password, WiFi.softAPIP()[0],WiFi.softAPIP()[1],WiFi.softAPIP()[2],WiFi.softAPIP()[3],
-        remote_server.c_str(), //remote server text
-        adminpassword.c_str(),
-        adminpassword.c_str(),  //remote server
-        isDHCP==1?"checked":"",  adminpassword.c_str(),  //OK update dhcp
-        adminpassword.c_str(),  //ip
-        adminpassword.c_str(),  //sn
-        adminpassword.c_str(),  //gw
-        adminpassword.c_str(),  //dns
-        wifissid.c_str(), adminpassword.c_str(),  //wifi ssid
-        wifipassword.c_str(), adminpassword.c_str(),  //wifi passwd
-        adminpassword.c_str(),  //update both
-        dY,dM,dD,dh,dm,ds,adminpassword.c_str(),  //date time
-        mqtt_id.c_str(), adminpassword.c_str(),   //m1
-        mqtt_server.c_str(), adminpassword.c_str(),   //m2
-        mqtt_port.c_str(), adminpassword.c_str(),   //m3
-        mqtt_user.c_str(), adminpassword.c_str(),   //m4
-        mqtt_pass.c_str(), adminpassword.c_str(),   //m5
-        mqtt_topic.c_str(), adminpassword.c_str(),   //m6
-        adminpassword.c_str(),   //update all mqtt
-        adminpassword.c_str(),   //refresh
-        adminpassword.c_str(),   //finish setup
-        WiFi.macAddress().c_str()
-      );
-    }
-    else {
-      sprintf(html,
-        "<html><head><title>Duet Configuration</title></head><body text=#ffffff bgcolor=#000088>"
-        "<h2>Lambda Nu Duet</h2>"
-        "%sCurrent:<br>IP = %d.%d.%d.%d (%s)<br>\n"
-        "Sub Netmask = %d.%d.%d.%d<br>\n"
-        "Gateway IP = %d.%d.%d.%d<br>\n"
-        "DNS IP = %d.%d.%d.%d<br><br>\n"
-        "WiFi SSID = %s<br>WiFi Password = %s<br><br>\n"
-        "AP SSID = %s<br>AP Password = %s<br>AP IP = %d.%d.%d.%d<br><br>\n"
-        "Remote Server = %s<br>\n"
-        "<br><br>"
-        "FW Ver. 1.22.06.17<br>"
-        "</body></html>",
-        shtml,
-        myip[0],myip[1],myip[2],myip[3],isDHCP==1?"DHCP":"Manual",
-        mysn[0],mysn[1],mysn[2],mysn[3],
-        mygw[0],mygw[1],mygw[2],mygw[3],
-        mydns[0],mydns[1],mydns[2],mydns[3],
-        wifissid.c_str(), wifipassword.c_str(),
-        ssid.c_str(), password, WiFi.softAPIP()[0],WiFi.softAPIP()[1],WiFi.softAPIP()[2],WiFi.softAPIP()[3],
-        remote_server.c_str()
-      );
-    }
-  }
   server.sendHeader("Connection", "close");
   server.send(200, "text/html", html); 
 
@@ -1126,44 +529,10 @@ void handleCMD()
 
 }
 
-void write_server_eeprom (char *s)
-{
-  for (pwd_c = 0; pwd_c <= strlen(s) && pwd_c < 79; ++pwd_c) {
-    EEPROM.write(__SERVER_ADDR__+pwd_c,s[pwd_c]);
-  }
-  EEPROM.commit();
-}
-
 void write_adminpass_eeprom (char *s)
 {
   for (pwd_c = 0; pwd_c <= strlen(s); ++pwd_c) {
     EEPROM.write(__ADMINPASS_ADDR__+pwd_c,s[pwd_c]);
-  }
-  EEPROM.commit();
-}
-
-void write_station_eeprom (int addr, IPAddress data)
-{
- //Serial.printf("addr:%d\r\n",addr);
-  for (int i = 0; i < 4; ++i) {
-    EEPROM.write(addr+i,data[i]);
-    //Serial.printf("data:%d\r\n",data[i]);
-  }
-  EEPROM.commit();
-}
-
-void write_wifipass_eeprom (char *s)
-{
-  for (pwd_c = 0; pwd_c <= strlen(s); ++pwd_c) {
-    EEPROM.write(__WIFIPASS_ADDR__+pwd_c,s[pwd_c]);
-  }
-  EEPROM.commit();
-}
-
-void write_wifissid_eeprom (char *s)
-{
-  for (pwd_c = 0; pwd_c <= strlen(s); ++pwd_c) {
-    EEPROM.write(__SSID_ADDR__+pwd_c,s[pwd_c]);
   }
   EEPROM.commit();
 }
@@ -1366,10 +735,15 @@ void enable_wifi()
   /*return index page which is stored in serverIndex */
   server.on("/", HTTP_GET, []() {
     server.sendHeader("Connection", "close");
-    sprintf(html,"%s%s%s%s%s%s%s%s",loginIndex1,adminpassword.c_str(),loginIndex2,loginIndex3,loginIndex4,adminpassword.c_str(),loginIndex5,loginIndex6);
+    sprintf(html,"%s",loginIndex1);
     server.send(200, "text/html", html);
-
   });
+
+  server.on("/favicon.ico", HTTP_GET, []() {
+    server.sendHeader("Connection", "close");
+    server.send(200, "image/x-icon", favicon);
+  });
+
 
 /*
   server.on("/style.css", HTTP_GET, [](AsyncWebServerRequest *request){
@@ -1380,103 +754,22 @@ void enable_wifi()
     server.sendHeader("Connection", "close");
     server.send(200, "text/html", serverIndex2);
   });
-*/
 
   server.on("/serverIndex", HTTP_GET, []() {
     server.sendHeader("Connection", "close");
     server.send(200, "text/html", serverIndex2);
   });
-  server.on("/favicon.ico", HTTP_GET, []() {
-    server.sendHeader("Connection", "close");
-    server.send(200, "image/x-icon", favicon);
-  });
+
+*/
 
   server.on("/cmd", HTTP_GET, []() {
     handleCMD();
   });
   
-  /*handling uploading firmware file */
-  server.on("/update", HTTP_POST, []() {
-    server.sendHeader("Connection", "close");
-    server.send(200, "text/plain", (Update.hasError()) ? "FAIL" : "OK");
-    ESP.restart();
-  }, []() {
-    HTTPUpload& upload = server.upload();
-    if (upload.status == UPLOAD_FILE_START) {
-      Serial.printf("#Firmware Upload Start, Stop WDT\r\n");
-      esp_task_wdt_delete(NULL);
-      esp_task_wdt_deinit();
-      Serial.printf("Update: %s\n", upload.filename.c_str());
-      if (!Update.begin(UPDATE_SIZE_UNKNOWN)) { //start with max available size
-        Update.printError(Serial);
-      }
-    } else if (upload.status == UPLOAD_FILE_WRITE) {
-      /* flashing firmware to ESP*/
-      if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
-        Update.printError(Serial);
-      }
-    } else if (upload.status == UPLOAD_FILE_END) {
-      if (Update.end(true)) { //true to set the size to the current progress
-        Serial.printf("Update Success: %u\nRebooting...\n", upload.totalSize);
-      } else {
-        Update.printError(Serial);
-      }
-    }
-  });
   server.begin();
-  //isWiFi = 0;
-
 }
 
-void write_mqttid_eeprom (char *s)
-{
-  for (pwd_c = 0; pwd_c <= strlen(s); ++pwd_c) {
-    EEPROM.write(__MQTT_ID_ADDR__+pwd_c,s[pwd_c]);
-  }
-  EEPROM.commit();
-}
 
-void write_mqttserver_eeprom (char *s)
-{
-  for (pwd_c = 0; pwd_c <= strlen(s); ++pwd_c) {
-    EEPROM.write(__MQTT_SERVER_ADDR__+pwd_c,s[pwd_c]);
-  }
-  EEPROM.commit();
-}
-
-void write_mqttport_eeprom (char *s)
-{
-  for (pwd_c = 0; pwd_c <= strlen(s); ++pwd_c) {
-    EEPROM.write(__MQTT_PORT_ADDR__+pwd_c,s[pwd_c]);
-  }
-  EEPROM.commit();
-}
-
-void write_mqttuser_eeprom (char *s)
-{
-  for (pwd_c = 0; pwd_c <= strlen(s); ++pwd_c) {
-    EEPROM.write(__MQTT_USER_ADDR__+pwd_c,s[pwd_c]);
-  }
-  EEPROM.commit();
-}
-
-void write_mqttpass_eeprom (char *s)
-{
-  for (pwd_c = 0; pwd_c <= strlen(s); ++pwd_c) {
-    EEPROM.write(__MQTT_PASS_ADDR__+pwd_c,s[pwd_c]);
-  }
-  EEPROM.commit();
-}
-
-void write_mqtttopic_eeprom (char *s)
-{
-  for (pwd_c = 0; pwd_c <= strlen(s); ++pwd_c) {
-    EEPROM.write(__MQTT_TOPIC_ADDR__+pwd_c,s[pwd_c]);
-  }
-  EEPROM.commit();
-}
-
-#if test == 0
 void setup()
 {
   EEPROM.begin(512);
@@ -1499,8 +792,10 @@ void setup()
   pinMode(CTRL4GWIFI,OUTPUT);
   pinMode(SDCS,OUTPUT);
   pinMode(EXCS,OUTPUT);
+  pinMode(ONEWIRE,OUTPUT);
+  pinMode(RAINPULSE,INPUT);
+  pinMode(WINDPULSE,INPUT);
   
-
   esp_task_wdt_init(WDT_TIMEOUT, true);  // enable panic so ESP32 restarts
   esp_task_wdt_add(NULL);  
   Serial.println("#Start wifi...");
@@ -1570,9 +865,41 @@ void setup()
   digitalWrite(BUZZER,HIGH);
   Serial.println("#Ready");
   delay(250);
-  //digitalWrite(BUZZER,LOW);
+  digitalWrite(BUZZER,LOW);
   digitalWrite(LED_STATUS,HIGH);
+  digitalWrite(BUZZER,HIGH);
+  delay(250);
+  digitalWrite(BUZZER,LOW);
   //testdrawline();      // Draw many lines
+}
+
+void short_beep()
+{
+  digitalWrite(BUZZER,HIGH);
+  delay(200);
+  digitalWrite(BUZZER,LOW);
+}
+
+void calc_ntc()
+{
+    int Vo;
+    float R1 = 10000;
+    float logR2, R2, tKelvin, tCelsius, tFahrenheit;
+    float c1 = 1.009249522e-03, c2 = 2.378405444e-04, c3 = 2.019202697e-07;
+
+    average = 0;
+    for (int i = 0; i < NUMSAMPLES; ++i) {
+      average += analogRead(THERMISTORPIN);
+      delay(10);
+    }
+    average /= NUMSAMPLES;
+    Vo = average;
+    R2 = R1 * (4095.0 / (float)Vo - 1.0); // resistance of the Thermistor
+    logR2 = log(R2);
+    tKelvin = (1.0 / (c1 + c2 * logR2 + c3 * logR2 * logR2 * logR2));
+    tCelsius = tKelvin - 273.15;
+    tFahrenheit = (tCelsius * 9.0) / 5.0 + 32.0;    
+    steinhart = tCelsius;
 }
 
 void loop()
@@ -1582,11 +909,36 @@ void loop()
   modbus.poll();
   MQTT_CLIENT.loop();
 
+  if(digitalRead(SDCD) != osdcd) {
+    delay(20);
+    if(digitalRead(SDCD) != osdcd) {
+      osdcd = digitalRead(SDCD);
+      Serial.printf("SDCard Detect = %d\n",osdcd);
+    }
+  }
+
+  if(digitalRead(RAINPULSE) != orain) {
+    delay(20);
+    if(digitalRead(RAINPULSE) != orain) {
+      orain = digitalRead(RAINPULSE);
+      Serial.printf("Rain Pulse = %d\n",orain);
+    }
+  }
+
+  if(digitalRead(WINDPULSE) != owind) {
+    delay(20);
+    if(digitalRead(WINDPULSE) != owind) {
+      owind = digitalRead(WINDPULSE);
+      Serial.printf("Wind Pulse = %d\n",owind);
+    }
+  }
 
   if(digitalRead(SW1)==LOW) {
     delay(20);
     if(digitalRead(SW1)==LOW) {
       Serial.println("#SW1 Press");
+      short_beep();
+      while(digitalRead(SW1)==LOW);
     }
   }
 
@@ -1594,6 +946,8 @@ void loop()
     delay(20);
     if(digitalRead(SW2)==LOW) {
       Serial.println("#SW2 Press");
+      short_beep();        
+      while(digitalRead(SW2)==LOW);
     }
   }
 
@@ -1601,6 +955,8 @@ void loop()
     delay(20);
     if(digitalRead(SW3)==LOW) {
       Serial.println("#SW3 Press");
+      short_beep();        
+      while(digitalRead(SW3)==LOW);
     }
   }
 
@@ -1608,238 +964,68 @@ void loop()
     delay(20);
     if(digitalRead(SW4)==LOW) {
       Serial.println("#SW4 Press");
+      short_beep();        
+      while(digitalRead(SW4)==LOW);
     }
   }
 
   if((uint32_t)(millis()-tsendscreen) >= SCREEN_TIME && SCREEN_TIME > 0) {
     tsendscreen = millis();
     digitalWrite(LED_STATUS,digitalRead(LED_STATUS)^1);
-    digitalWrite(BUZZER,digitalRead(BUZZER)^1);
+    //digitalWrite(BUZZER,digitalRead(BUZZER)^1);
+    digitalWrite(CTRL4GWIFI,digitalRead(LED_STATUS));
+    digitalWrite(EXCS,digitalRead(LED_STATUS));                                                                                                                                                                                                                                                                                ;
+    digitalWrite(ONEWIRE,digitalRead(LED_STATUS));
+
+    calc_ntc();
+
+    //Serial.print("NTC ADC = "); 
+    //Serial.println((int)average);
+    Serial.print("Temperature "); 
+    Serial.print(steinhart);
+    Serial.println(" *C");
+
+    //Serial.printf("Rain = %d\n",digitalRead(RAINPULSE));
+    //Serial.printf("Wind = %d\n",digitalRead(WINDPULSE));
+
+    display.fillRect(0,16,128,16,0);
+    display.setTextSize(1);
+    display.setCursor(10, 18);
+    display.printf("#NTC %0.0f",average);
+    display.printf(" = %0.1f C",steinhart);
+
+    display.display();
+
+    Serial2.begin(9600,SERIAL_8N1,CTRX,CTTX);
+    Serial2.print("#CT ");
+    Serial2.print("Temperature "); 
+    Serial2.print(steinhart);
+    Serial2.println(" *C");
+    Serial2.flush();
+    Serial2.end();    
+    delay(200);
+
+    Serial2.begin(9600,SERIAL_8N1,PMRX,PMTX);
+    Serial2.print("#PM ");
+    Serial2.print("Temperature "); 
+    Serial2.print(steinhart);
+    Serial2.println(" *C");
+    Serial2.flush();
+    Serial2.end();    
+    delay(200);
+
+    Serial2.begin(9600,SERIAL_8N1,CO2RX,CO2TX);
+    Serial2.print("#CO2 ");
+    Serial2.print("Temperature "); 
+    Serial2.print(steinhart);
+    Serial2.println(" *C");
+    Serial2.flush();
+    Serial2.end();    
+    delay(200);
 
   }
 
 }
-#elif test == 1
-void setup() {
-  //delay(2000);
-
-  // put your setup code here, to run once:
-  EEPROM.begin(512);
-  sSerial.begin(9600, EspSoftwareSerial::SWSERIAL_8N1, RX0, TX0);
-  Serial.begin(9600,SERIAL_8N1, PMRX, PMTX);
-  //Serial.begin(115200, SERIAL_8N1, RX0, TX0);
-  Wire.begin(SDA,SCL);
-
-  pinMode(SW1,INPUT_PULLUP);
-  pinMode(SW2,INPUT_PULLUP);
-  
-
-  pinMode(SW3,INPUT);
-  pinMode(SW4,INPUT);
-  pinMode(SDCD,INPUT);
-  pinMode(TX485,OUTPUT);
-  pinMode(CTRL4GWIFI,OUTPUT);
-  pinMode(SDCS,OUTPUT);
-  pinMode(EXCS,OUTPUT);
-
-  esp_task_wdt_init(WDT_TIMEOUT, true);  // enable panic so ESP32 restarts
-  esp_task_wdt_add(NULL);  
-  Serial.println("#Start wifi...");
-  enable_wifi();
-
-  if (WiFi.status() == WL_CONNECTED) {
-    mqtt_iddf = strtol(mac4.c_str(),NULL,16);
-    mqtt_topicdf = "/iaq/" + mac6;
-    enable_mqtt();
-    lastmqtt = millis()-(uint32_t)(mqtt_stime*1000);
-    if(WiFi.status() != WL_CONNECTED) {
-      //lcdtft.println("#WiFi Connection Skipped");
-    }
-    else {
-      //lcdtft.println("#WiFi Connection Ok");
-    }
-  }
-  else {
-    //lcdtft.println("#WiFi Connection Fail!!");
-  }
-
-  if (! rtc.begin()) {
-    Serial.println("#Couldn't find RTC.");
-  }
-  else {
-    Serial.println("#RTC init Ok.");
-    rtc.start();
-  }
-
-  if (WiFi.status() == WL_CONNECTED) {
-    DateTime now = rtc.now();
-    if (now.year() < 22) {
-      Serial.printf("#Date Time seem not valid, request NTP...");
-      if (!request_ntp_setdatetime(10)) {
-        if (!request_ntp_setdatetime(10)) {
-          if (!request_ntp_setdatetime(10)) {
-            Serial.printf("#Too many retry NTP request, reboot...");
-            ESP.restart();
-          }
-        }
-      }
-    }
-    else {
-      Serial.printf("#Date Time looks Ok, no need to request NTP.\r\n");
-    }    
-  }
-
-  mhz19e.begin(&Serial2);
-  Serial2.begin(9600,SERIAL_8N1,CO2RX,CO2TX);
-  Serial.print("#mhz19e.measure() = ");
-  Serial.println(mhz19e.measure());
-
- 	SPI.setFrequency(2000000);
-	SPI.begin(SDSCK,SDMISO,SDMOSI); //sck, miso, mosi, ss
-
-  //test_sdcard();
-
-  Serial1.begin(baud,config);
-  modbus.begin(id,baud);
-  modbus.configureInputRegisters(numInputRegisters, inputRegisterRead);
-  Serial.println("#Init MODBUS done.");
-
-}
-
-void loop() {
-  // put your main code here, to run repeatedly:
-  esp_task_wdt_reset();
-  server.handleClient();
-  modbus.poll();
-  MQTT_CLIENT.loop();
-
-  if(digitalRead(SW1)==LOW) {
-    delay(20);
-    if(digitalRead(SW1)==LOW) {
-      Serial.println("#SW1 Press");
-    }
-  }
-
-  if(digitalRead(SW2)==LOW) {
-    delay(20);
-    if(digitalRead(SW2)==LOW) {
-      Serial.println("#SW2 Press");
-    }
-  }
-
-  if(digitalRead(SW3)==LOW) {
-    delay(20);
-    if(digitalRead(SW3)==LOW) {
-      Serial.println("#SW3 Press");
-    }
-  }
-
-  if(digitalRead(SW4)==LOW) {
-    delay(20);
-    if(digitalRead(SW4)==LOW) {
-      Serial.println("#SW4 Press");
-    }
-  }
-
-  if((uint32_t)(millis()-tsendscreen) >= SCREEN_TIME && SCREEN_TIME > 0) {
-    tsendscreen = millis();
-
-    Serial.print("#mhz19e.measure() = ");
-    int ret2 = mhz19e.measure();
-    Serial.print(ret2);
-    Serial.print(", first = ");
-    Serial.print(first);
-    Serial.print(", co2 = ");
-    Serial.println(mhz19e.getCO2());
-    if (ret2 == 0 && !(first==true && mhz19e.getCO2()==500)) {
-      first = false;
-      Serial.print("#CO2:  ");
-      Serial.print(mhz19e.getCO2());
-      Serial.print(", MCO2: ");
-      Serial.print(mhz19e.getMinCO2());
-      Serial.print(", Temp: ");
-      Serial.println(mhz19e.getTemperature());
-      //Serial.print(", Accu: ");
-      //Serial.println(mhz19e.getAccuracy());
-
-      rmodbus[3] = mhz19e.getCO2();
-    }
-    else {
-      Serial.println("#CO2 Initializg...");
-    }
-
-    if (readPMSdata(&Serial)) {
-      //print AQI
-      int ri = 0;
-      for (i = 0; i < 8; ++i) {
-        if (pmsdata.pm25_env <= aqitab[i].cH) {
-          ri = i;
-          break;  
-        }
-      }
-      if (i == 8) ri = 7;
-      aqi = (double)((aqitab[ri].BH-aqitab[ri].BL)/(aqitab[ri].cH-aqitab[ri].cL))*(pmsdata.pm25_env-aqitab[ri].cL)+aqitab[ri].BL;
-
-      uint16_t cpm25 = round(aqi);
-
-      Serial.printf("%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\r\n",
-        (uint16_t)round(aqi),
-        (uint16_t)pmsdata.pm10_env,
-        (uint16_t)pmsdata.pm25_env,
-        (uint16_t)pmsdata.pm100_env,
-        (uint16_t)pmsdata.particles_03um,
-        (uint16_t)pmsdata.particles_05um,
-        (uint16_t)pmsdata.particles_10um,
-        (uint16_t)pmsdata.particles_25um,
-        (uint16_t)pmsdata.particles_50um,
-        (uint16_t)pmsdata.particles_100um
-        );
-
-        rmodbus[4] = (uint16_t)round(aqi);
-        rmodbus[5] = pmsdata.pm25_env;
-        //rmodbus[6] = pmsdata.pm10_env;
-        rmodbus[6] = pmsdata.pm100_env;
-
-        sprintf(st,"AQI (PM2.5) = %d",rmodbus[4]);
-        Serial.println(st);
-        sprintf(st,"PM 2.5 = %d",rmodbus[5]);
-        Serial.println(st);
-        //sprintf(st,"PM 1.0 = %d",rmodbus[6]);
-        //Serial.println(st);
-        sprintf(st,"PM 10 = %d",rmodbus[6]);
-        Serial.println(st);
-
-/*      
-      // reading data was successful!
-      Serial.println();
-      Serial.println("---------------------------------------");
-      Serial.print("PM 1.0: "); Serial1.print(pmsdata.pm10_env);
-      Serial.print("\t\tPM 2.5: "); Serial1.print(pmsdata.pm25_env);
-      Serial.print("\t\tPM 10: "); Serial1.println(pmsdata.pm100_env);
-      Serial.println("---------------------------------------");
-      Serial.print("Size\t> 0.3 um / 0.1L air:"); Serial1.println(pmsdata.particles_03um);
-      Serial.print("\t> 0.5 um / 0.1L air:"); Serial1.println(pmsdata.particles_05um);
-      Serial.print("\t> 1.0 um / 0.1L air:"); Serial1.println(pmsdata.particles_10um);
-      Serial.print("\t> 2.5 um / 0.1L air:"); Serial1.println(pmsdata.particles_25um);
-      Serial.print("\t> 5.0 um / 0.1L air:"); Serial1.println(pmsdata.particles_50um);
-      Serial.print("\t> 10 um / 0.1L air:"); Serial1.println(pmsdata.particles_100um);
-      Serial.println("---------------------------------------");
-      Serial.print("AQI (PM2.5) = "); Serial1.println((uint16_t)round(aqi));
-      Serial.println("---------------------------------------");
-*/  
-  //    delay(50);
-
-    }
-    else {
-      Serial.printf("#can't read PM sensor\n");
-    }
-
-
-  }
-}
-
-#else
-#endif
 
 
 // put function definitions here:
@@ -1898,8 +1084,6 @@ bool request_ntp_setdatetime(int wsec)
 
 void test_sdcard()
 {
-  //digitalWrite(SDCS,LOW);
-
   if(!SD.begin(SDCS)){
     Serial.println("#Card Mount Failed");
     return;
@@ -1924,15 +1108,17 @@ void test_sdcard()
 
   uint64_t cardSize = SD.cardSize() / (1024 * 1024);
   Serial.printf("#SD Card Size: %lluMB\n", cardSize);
-/*
   listDir(SD, "/", 0);
   createDir(SD, "/mydir");
+/*
   listDir(SD, "/", 0);
   removeDir(SD, "/mydir");
   listDir(SD, "/", 2);
+*/  
   writeFile(SD, "/hello.txt", "Hello ");
   appendFile(SD, "/hello.txt", "World!\n");
   readFile(SD, "/hello.txt");
+/*
   deleteFile(SD, "/foo.txt");
   renameFile(SD, "/hello.txt", "/foo.txt");
   readFile(SD, "/foo.txt");
@@ -1940,9 +1126,6 @@ void test_sdcard()
 */  
   Serial.printf("#Total space: %lluMB\n", SD.totalBytes() / (1024 * 1024));
   Serial.printf("#Used space: %lluMB\n", SD.usedBytes() / (1024 * 1024));
-
-  //digitalWrite(SDCS,HIGH);
-
 }
 
 void printDirectory(File dir, int numTabs)
