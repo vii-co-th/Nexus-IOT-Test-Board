@@ -984,17 +984,21 @@ void loop()
     Serial.print("Temperature "); 
     Serial.print(steinhart);
     Serial.println(" *C");
-
-    //Serial.printf("Rain = %d\n",digitalRead(RAINPULSE));
-    //Serial.printf("Wind = %d\n",digitalRead(WINDPULSE));
-
     display.fillRect(0,16,128,16,0);
     display.setTextSize(1);
     display.setCursor(10, 18);
     display.printf("#NTC %0.0f",average);
     display.printf(" = %0.1f C",steinhart);
-
     display.display();
+
+    //Serial.printf("Rain = %d\n",digitalRead(RAINPULSE));
+    //Serial.printf("Wind = %d\n",digitalRead(WINDPULSE));
+
+    //read solar sensor, par sensor
+    int w2 = analogRead(SOLARADC);
+    int w3 = analogRead(PARADC);
+    Serial.printf("Solar Sensor ADC = %d\n",w2);
+    Serial.printf("Par Sensor ADC = %d\n",w3);
 
     Serial2.begin(9600,SERIAL_8N1,CTRX,CTTX);
     Serial2.print("#CT ");
