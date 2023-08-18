@@ -4,6 +4,8 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 
+#define testcanbus  1
+  
 #define SW1 45
 #define SW2 46
 #define SW3 47
@@ -137,7 +139,10 @@ const unsigned int bufSize = 256;
 byte buf[bufSize];
 #define MAXREGISTER_MODBUS  12
 const unsigned int numInputRegisters = MAXREGISTER_MODBUS;
+#if testcanbus == 0
 ModbusRTUSlave modbus(Serial1, buf, bufSize,RS485RE_DE);
+#else
+#endif
 int inputRegisterRead(short unsigned int address);
 int rmodbus[MAXREGISTER_MODBUS] = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
 
@@ -842,9 +847,12 @@ void setup()
   test_sdcard();
 
   Serial1.begin(baud,config,RX1,TX1);
+  #if testcanbus == 0
   modbus.begin(id,baud);
   modbus.configureInputRegisters(numInputRegisters, inputRegisterRead);
   Serial.println("#Init MODBUS done.");
+#else
+#endif
 
   if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
     Serial.println(F("#SSD1306 allocation failed"));
@@ -906,7 +914,10 @@ void loop()
 {
   esp_task_wdt_reset();
   server.handleClient();
+#if testcanbus == 0
   modbus.poll();
+#else
+#endif  
   MQTT_CLIENT.loop();
 
   if(digitalRead(SDCD) != osdcd) {
@@ -1025,6 +1036,13 @@ void loop()
     Serial2.println(" *C");
     Serial2.flush();
     Serial2.end();    
+    delay(200);
+
+    Serial1.print("#Canbus ");
+    Serial1.print("Temperature "); 
+    Serial1.print(steinhart);
+    Serial1.println(" *C");
+    Serial1.flush();
     delay(200);
 
   }
