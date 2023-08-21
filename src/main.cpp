@@ -394,6 +394,8 @@ uint32_t tsendweb = -WEB_TIME;
 uint32_t tsendscreen = -SCREEN_TIME;
 uint32_t tsec = 0;
 int bx = 0;
+int bh = 1;
+int bhdir = 1;
 int i = 0;
 
 #define DEFAULT_INTERVALTIME  600
@@ -1023,12 +1025,12 @@ void loop()
     delay(20);
     if(digitalRead(SW1)==LOW) {
       Serial.println("#SW1 Press");
-      display.setCursor(128-8*4, 0);
+      display.setCursor(112-8*4, 0);
       display.printf("1");
       display.display();    
       short_beep();
       while(digitalRead(SW1)==LOW);
-      display.fillRect(128-8*4,0,8,8,SSD1306_BLACK);
+      display.fillRect(112-8*4,0,8,8,SSD1306_BLACK);
       display.display();    
     }
   }
@@ -1037,12 +1039,12 @@ void loop()
     delay(20);
     if(digitalRead(SW2)==LOW) {
       Serial.println("#SW2 Press");
-      display.setCursor(128-8*3, 0);
+      display.setCursor(112-8*3, 0);
       display.printf("2");
       display.display();    
       short_beep();
       while(digitalRead(SW2)==LOW);
-      display.fillRect(128-8*3,0,8,8,SSD1306_BLACK);
+      display.fillRect(112-8*3,0,8,8,SSD1306_BLACK);
       display.display();    
     }
   }
@@ -1051,12 +1053,12 @@ void loop()
     delay(20);
     if(digitalRead(SW3)==LOW) {
       Serial.println("#SW3 Press");
-      display.setCursor(128-8*2, 0);
+      display.setCursor(112-8*2, 0);
       display.printf("3");
       display.display();    
       short_beep();
       while(digitalRead(SW3)==LOW);
-      display.fillRect(128-8*2,0,8,8,SSD1306_BLACK);
+      display.fillRect(112-8*2,0,8,8,SSD1306_BLACK);
       display.display();    
     }
   }
@@ -1065,12 +1067,12 @@ void loop()
     delay(20);
     if(digitalRead(SW4)==LOW) {
       Serial.println("#SW4 Press");
-      display.setCursor(128-8*1, 0);
+      display.setCursor(112-8*1, 0);
       display.printf("4");
       display.display();    
       short_beep();
       while(digitalRead(SW4)==LOW);
-      display.fillRect(128-8*1,0,8,8,SSD1306_BLACK);
+      display.fillRect(112-8*1,0,8,8,SSD1306_BLACK);
       display.display();    
     }
   }
@@ -1079,10 +1081,29 @@ void loop()
   if((uint32_t)(millis()-tsec) >= 1000) {
     tsec = millis();
     DateTime now = rtc.now();
-    display.fillRect(0,18,128,9,SSD1306_BLACK);
+    display.fillRect(0,18,128,15,SSD1306_BLACK);
     display.setTextSize(1);
     display.setCursor(0, 18);
-    display.printf("%02d/%02d/%04d %02d:%02d %c%c%c",now.day(),now.month(),now.year()+543,now.hour(),now.minute(),daysOfTheWeek[now.dayOfTheWeek()][0],daysOfTheWeek[now.dayOfTheWeek()][1],daysOfTheWeek[now.dayOfTheWeek()][2]);
+    display.printf("%02d/%02d/%02d %02d:%02d:%02d %c%c",now.day(),now.month(),now.year()+543-2500,now.hour(),now.minute(),now.second(),daysOfTheWeek[now.dayOfTheWeek()][0],daysOfTheWeek[now.dayOfTheWeek()][1],daysOfTheWeek[now.dayOfTheWeek()][2]);
+    //display.fillRect(0,27,128,9,SSD1306_BLACK);
+    display.fillRect(bx,29-(bh-1),8,bh*2-1,SSD1306_WHITE);
+    if (bhdir == 1) {
+      ++bh; 
+      if (bh > 3) {
+        bhdir = 0;
+        --bh; --bh;
+      }   
+    }
+    else {
+      --bh;
+      if (bh < 1) {
+        bhdir = 1;
+        ++bh; ++bh;
+      }
+    }
+    bx += 8;
+    if (bx >= 128-8) bx = 0;
+
     display.display();    
   }
 
@@ -1096,6 +1117,14 @@ void loop()
     digitalWrite(CTRL4GWIFI,digitalRead(LED_STATUS));
     digitalWrite(EXCS,digitalRead(LED_STATUS));                                                                                                                                                                                                                                                                                ;
     //digitalWrite(ONEWIRE,digitalRead(LED_STATUS));
+    if (digitalRead(LED_STATUS) == HIGH) {
+      display.fillCircle(122,4,4,SSD1306_WHITE);
+    }
+    else {
+      display.fillRect(116,0,12,8,SSD1306_BLACK);
+      display.drawCircle(122,4,4,SSD1306_WHITE);
+    }
+    display.display();
 
     calc_ntc();
 #if usenon == 1    
@@ -1150,10 +1179,6 @@ void loop()
     display.setCursor(0, 9);
     display.printf("#NTC Temp.",average);
     display.printf(" = %0.1f C",steinhart);
-    display.fillRect(0,27,128,9,SSD1306_BLACK);
-    display.fillRect(bx,29,8,2,SSD1306_WHITE);
-    bx += 8;
-    if (bx >= 128-8) bx = 0;
     display.display();
 
     //Serial.printf("Rain = %d\n",digitalRead(RAINPULSE));
@@ -1173,7 +1198,7 @@ void loop()
     Serial2.println(" *C\n");
     Serial2.flush();
     Serial2.end();    
-    delay(200);
+    delay(20);
 
     Serial2.begin(9600,SERIAL_8N1,PMRX,PMTX);
     Serial2.printf("#RTC Date = %02d/%02d/%04d Time = %02d:%02d:%02d Day=%s\r\n",now.day(),now.month(),now.year()+543,now.hour(),now.minute(),now.second(),daysOfTheWeek[now.dayOfTheWeek()]);
@@ -1183,7 +1208,7 @@ void loop()
     Serial2.println(" *C\n");
     Serial2.flush();
     Serial2.end();    
-    delay(200);
+    delay(20);
 
     Serial2.begin(9600,SERIAL_8N1,CO2RX,CO2TX);
     Serial2.printf("#RTC Date = %02d/%02d/%04d Time = %02d:%02d:%02d Day=%s\r\n",now.day(),now.month(),now.year()+543,now.hour(),now.minute(),now.second(),daysOfTheWeek[now.dayOfTheWeek()]);
@@ -1193,7 +1218,7 @@ void loop()
     Serial2.println(" *C\n");
     Serial2.flush();
     Serial2.end();    
-    delay(200);
+    delay(20);
 
     Serial1.printf("#RTC Date = %02d/%02d/%04d Time = %02d:%02d:%02d Day=%s\r\n",now.day(),now.month(),now.year()+543,now.hour(),now.minute(),now.second(),daysOfTheWeek[now.dayOfTheWeek()]);
     Serial1.print("#Canbus ");
@@ -1201,7 +1226,7 @@ void loop()
     Serial1.print(steinhart);
     Serial1.println(" *C\n");
     Serial1.flush();
-    delay(200);
+    delay(20);
 
     Serial.println();
   }
