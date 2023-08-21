@@ -10,8 +10,8 @@
 #define SW2 46
 #define SW3 47
 #define SW4 48
-#define LED_STATUS  41 
-#define BUZZER  40
+#define LED_STATUS  40 
+#define BUZZER  41
 #define CTRL4GWIFI  42
 #define RX0 36
 #define TX0 37
@@ -369,6 +369,8 @@ long tmillis;
 uint32_t trun = 0;
 uint32_t tsendweb = -WEB_TIME;
 uint32_t tsendscreen = -SCREEN_TIME;
+uint32_t tsec = 0;
+int bx = 0;
 int i = 0;
 
 #define DEFAULT_INTERVALTIME  600
@@ -778,7 +780,7 @@ void enable_wifi()
 void setup()
 {
   EEPROM.begin(512);
-  Serial.begin(9600);
+  Serial.begin(115200);
 
   Wire.begin(SDA,SCL);
   
@@ -864,9 +866,9 @@ void setup()
   // Show initial display buffer contents on the screen --
   // the library initializes this with an Adafruit splash screen.
   display.clearDisplay();
-  display.setTextSize(2); // Draw 2X-scale text
+  display.setTextSize(1);
   display.setTextColor(SSD1306_WHITE);
-  display.setCursor(10, 0);
+  display.setCursor(0, 0);
   display.println(F("#Ready"));
   display.display();
 
@@ -980,7 +982,24 @@ void loop()
     }
   }
 
+  //every sec
+  if((uint32_t)(millis()-tsec) >= 1000) {
+    tsec = millis();
+    DateTime now = rtc.now();
+    display.fillRect(0,18,128,15,SSD1306_BLACK);
+    display.setTextSize(1);
+    display.setCursor(0, 18);
+    display.printf("%02d/%02d/%04d %02d:%02d %c%c%c",now.day(),now.month(),now.year()+543,now.hour(),now.minute(),daysOfTheWeek[now.dayOfTheWeek()][0],daysOfTheWeek[now.dayOfTheWeek()][1],daysOfTheWeek[now.dayOfTheWeek()][2]);
+    display.fillRoundRect(bx,28,8,4,1,SSD1306_WHITE);
+    bx += 8;
+    if (bx >= 128-8) bx = 0;
+    display.display();    
+  }
+
   if((uint32_t)(millis()-tsendscreen) >= SCREEN_TIME && SCREEN_TIME > 0) {
+    DateTime now = rtc.now();
+    Serial.printf("RTC Date = %02d/%02d/%04d Time = %02d:%02d:%02d Day=%s\r\n",now.day(),now.month(),now.year()+543,now.hour(),now.minute(),now.second(),daysOfTheWeek[now.dayOfTheWeek()]);
+
     tsendscreen = millis();
     digitalWrite(LED_STATUS,digitalRead(LED_STATUS)^1);
     //digitalWrite(BUZZER,digitalRead(BUZZER)^1);
@@ -995,10 +1014,10 @@ void loop()
     Serial.print("Temperature "); 
     Serial.print(steinhart);
     Serial.println(" *C");
-    display.fillRect(0,16,128,16,0);
+    display.fillRect(0,9,128,9,SSD1306_BLACK);
     display.setTextSize(1);
-    display.setCursor(10, 18);
-    display.printf("#NTC %0.0f",average);
+    display.setCursor(0, 9);
+    display.printf("#NTC Temp.",average);
     display.printf(" = %0.1f C",steinhart);
     display.display();
 
@@ -1012,39 +1031,44 @@ void loop()
     Serial.printf("Par Sensor ADC = %d\n",w3);
 
     Serial2.begin(9600,SERIAL_8N1,CTRX,CTTX);
+    Serial2.printf("#RTC Date = %02d/%02d/%04d Time = %02d:%02d:%02d Day=%s\r\n",now.day(),now.month(),now.year()+543,now.hour(),now.minute(),now.second(),daysOfTheWeek[now.dayOfTheWeek()]);
     Serial2.print("#CT ");
     Serial2.print("Temperature "); 
     Serial2.print(steinhart);
-    Serial2.println(" *C");
+    Serial2.println(" *C\n");
     Serial2.flush();
     Serial2.end();    
     delay(200);
 
     Serial2.begin(9600,SERIAL_8N1,PMRX,PMTX);
+    Serial2.printf("#RTC Date = %02d/%02d/%04d Time = %02d:%02d:%02d Day=%s\r\n",now.day(),now.month(),now.year()+543,now.hour(),now.minute(),now.second(),daysOfTheWeek[now.dayOfTheWeek()]);
     Serial2.print("#PM ");
     Serial2.print("Temperature "); 
     Serial2.print(steinhart);
-    Serial2.println(" *C");
+    Serial2.println(" *C\n");
     Serial2.flush();
     Serial2.end();    
     delay(200);
 
     Serial2.begin(9600,SERIAL_8N1,CO2RX,CO2TX);
+    Serial2.printf("#RTC Date = %02d/%02d/%04d Time = %02d:%02d:%02d Day=%s\r\n",now.day(),now.month(),now.year()+543,now.hour(),now.minute(),now.second(),daysOfTheWeek[now.dayOfTheWeek()]);
     Serial2.print("#CO2 ");
     Serial2.print("Temperature "); 
     Serial2.print(steinhart);
-    Serial2.println(" *C");
+    Serial2.println(" *C\n");
     Serial2.flush();
     Serial2.end();    
     delay(200);
 
+    Serial1.printf("#RTC Date = %02d/%02d/%04d Time = %02d:%02d:%02d Day=%s\r\n",now.day(),now.month(),now.year()+543,now.hour(),now.minute(),now.second(),daysOfTheWeek[now.dayOfTheWeek()]);
     Serial1.print("#Canbus ");
     Serial1.print("Temperature "); 
     Serial1.print(steinhart);
-    Serial1.println(" *C");
+    Serial1.println(" *C\n");
     Serial1.flush();
     delay(200);
 
+    Serial.println();
   }
 
 }
@@ -1098,7 +1122,7 @@ bool request_ntp_setdatetime(int wsec)
 
   rtc.adjust(DateTime(2000+dY,dM,dD,dh,dm,ds));
   DateTime now = rtc.now();
-  Serial.printf("RTC Date = %02d/%02d/%04d Time = %02d:%02d:%02d Day=%s\r\n",now.day(),now.month(),now.year(),now.hour(),now.minute(),now.second(),daysOfTheWeek[now.dayOfTheWeek()]);
+  Serial.printf("RTC Date = %02d/%02d/%04d Time = %02d:%02d:%02d Day=%s\r\n",now.day(),now.month(),now.year()+543,now.hour(),now.minute(),now.second(),daysOfTheWeek[now.dayOfTheWeek()]);
 
   return true;
 
