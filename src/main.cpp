@@ -1221,7 +1221,7 @@ void loop()
     delay(20);
 
     Serial1.printf("#RTC Date = %02d/%02d/%04d Time = %02d:%02d:%02d Day=%s\r\n",now.day(),now.month(),now.year()+543,now.hour(),now.minute(),now.second(),daysOfTheWeek[now.dayOfTheWeek()]);
-    Serial1.print("#Canbus ");
+    Serial1.print("#Canbus/UART/RS232 ");
     Serial1.print("Temperature "); 
     Serial1.print(steinhart);
     Serial1.println(" *C\n");
