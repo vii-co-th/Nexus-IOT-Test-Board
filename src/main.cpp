@@ -59,7 +59,30 @@ void testFileIO(fs::FS &fs, const char * path);
 MHZ19E mhz19e;
 
 #include <OneWire.h>
-//OneWire  ow(ONEWIRE);  // on pin 10 (a 4.7K resistor is necessary)
+#include <DallasTemperature.h>
+#define usenon  1   //1 multi-nonblock (test 2 ds18b20 sensor), 2 multi (test 2 ds18b20 sensor), 0 one sensor skip rom
+  OneWire oneWire(ONEWIRE);
+#if usenon == 1
+#include <NonBlockingDallas.h>
+  DallasTemperature sensors(&oneWire);
+  NonBlockingDallas sensorDs18b20(&sensors);    //Create a new instance of the NonBlockingDallas class
+#elif usenon == 2
+  DallasTemperature sensors(&oneWire);
+  DeviceAddress insideThermometer, outsideThermometer;
+#endif
+#define TIME_INTERVAL 1500                      //Time interval among sensor readings [milliseconds]
+#define TEMPERATURE_PRECISION 9
+
+#if usenon == 1
+  void handleIntervalElapsed(float temperature, bool valid, int deviceIndex);
+  void handleTemperatureChange(float temperature, bool valid, int deviceIndex);
+  void handleDeviceDisconnected(int deviceIndex);
+#elif usenon == 2
+  void printAddress(DeviceAddress deviceAddress);
+  void printTemperature(DeviceAddress deviceAddress);
+  void printResolution(DeviceAddress deviceAddress);
+  void printData(DeviceAddress deviceAddress);
+#endif
 
 //OLED
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
@@ -799,7 +822,7 @@ void setup()
   pinMode(CTRL4GWIFI,OUTPUT);
   pinMode(SDCS,OUTPUT);
   pinMode(EXCS,OUTPUT);
-  pinMode(ONEWIRE,OUTPUT);
+  //pinMode(ONEWIRE,OUTPUT);
   pinMode(RAINPULSE,INPUT);
   pinMode(WINDPULSE,INPUT);
   
@@ -863,6 +886,55 @@ void setup()
   else {
     Serial.println(F("#SSD1306 allocation ok"));
   }
+
+#if usenon == 1
+  //Initialize the sensor passing the resolution, unit of measure and reading interval [milliseconds]
+  sensorDs18b20.begin(NonBlockingDallas::resolution_12, NonBlockingDallas::unit_C, TIME_INTERVAL);
+
+  //Callbacks
+  sensorDs18b20.onIntervalElapsed(handleIntervalElapsed);
+  sensorDs18b20.onTemperatureChange(handleTemperatureChange);
+  sensorDs18b20.onDeviceDisconnected(handleDeviceDisconnected);
+  //sensorDs18b20.requestTemperature();
+#elif usenon == 2
+  sensors.begin();
+  // locate devices on the bus
+  Serial.print("Locating devices...");
+  Serial.print("Found ");
+  Serial.print(sensors.getDeviceCount(), DEC);
+  Serial.println(" devices.");
+
+  // report parasite power requirements
+  Serial.print("Parasite power is: "); 
+  if (sensors.isParasitePowerMode()) Serial.println("ON");
+  else Serial.println("OFF");
+  if (!sensors.getAddress(insideThermometer, 0)) Serial.println("Unable to find address for Device 0"); 
+  if (!sensors.getAddress(outsideThermometer, 1)) Serial.println("Unable to find address for Device 1"); 
+  Serial.print("Device 0 Address: ");
+  printAddress(insideThermometer);
+  Serial.println();
+
+  Serial.print("Device 1 Address: ");
+  printAddress(outsideThermometer);
+  Serial.println();
+
+  // set the resolution to 9 bit
+  sensors.setResolution(insideThermometer, TEMPERATURE_PRECISION);
+  sensors.setResolution(outsideThermometer, TEMPERATURE_PRECISION);
+
+  Serial.print("Device 0 Resolution: ");
+  Serial.print(sensors.getResolution(insideThermometer), DEC); 
+  Serial.println();
+
+  Serial.print("Device 1 Resolution: ");
+  Serial.print(sensors.getResolution(outsideThermometer), DEC); 
+  Serial.println();
+#else  
+  oneWire.reset();
+  oneWire.write(0xcc);
+  oneWire.write(0x44);
+#endif  
+  
   // Show initial display buffer contents on the screen --
   // the library initializes this with an Adafruit splash screen.
   display.clearDisplay();
@@ -921,6 +993,7 @@ void loop()
 #else
 #endif  
   MQTT_CLIENT.loop();
+  //sensorDs18b20.update();
 
   if(digitalRead(SDCD) != osdcd) {
     delay(20);
@@ -950,8 +1023,13 @@ void loop()
     delay(20);
     if(digitalRead(SW1)==LOW) {
       Serial.println("#SW1 Press");
+      display.setCursor(128-8*4, 0);
+      display.printf("1");
+      display.display();    
       short_beep();
       while(digitalRead(SW1)==LOW);
+      display.fillRect(128-8*4,0,8,8,SSD1306_BLACK);
+      display.display();    
     }
   }
 
@@ -959,8 +1037,13 @@ void loop()
     delay(20);
     if(digitalRead(SW2)==LOW) {
       Serial.println("#SW2 Press");
-      short_beep();        
+      display.setCursor(128-8*3, 0);
+      display.printf("2");
+      display.display();    
+      short_beep();
       while(digitalRead(SW2)==LOW);
+      display.fillRect(128-8*3,0,8,8,SSD1306_BLACK);
+      display.display();    
     }
   }
 
@@ -968,8 +1051,13 @@ void loop()
     delay(20);
     if(digitalRead(SW3)==LOW) {
       Serial.println("#SW3 Press");
-      short_beep();        
+      display.setCursor(128-8*2, 0);
+      display.printf("3");
+      display.display();    
+      short_beep();
       while(digitalRead(SW3)==LOW);
+      display.fillRect(128-8*2,0,8,8,SSD1306_BLACK);
+      display.display();    
     }
   }
 
@@ -977,8 +1065,13 @@ void loop()
     delay(20);
     if(digitalRead(SW4)==LOW) {
       Serial.println("#SW4 Press");
-      short_beep();        
+      display.setCursor(128-8*1, 0);
+      display.printf("4");
+      display.display();    
+      short_beep();
       while(digitalRead(SW4)==LOW);
+      display.fillRect(128-8*1,0,8,8,SSD1306_BLACK);
+      display.display();    
     }
   }
 
@@ -986,13 +1079,10 @@ void loop()
   if((uint32_t)(millis()-tsec) >= 1000) {
     tsec = millis();
     DateTime now = rtc.now();
-    display.fillRect(0,18,128,15,SSD1306_BLACK);
+    display.fillRect(0,18,128,9,SSD1306_BLACK);
     display.setTextSize(1);
     display.setCursor(0, 18);
     display.printf("%02d/%02d/%04d %02d:%02d %c%c%c",now.day(),now.month(),now.year()+543,now.hour(),now.minute(),daysOfTheWeek[now.dayOfTheWeek()][0],daysOfTheWeek[now.dayOfTheWeek()][1],daysOfTheWeek[now.dayOfTheWeek()][2]);
-    display.fillRoundRect(bx,28,8,4,1,SSD1306_WHITE);
-    bx += 8;
-    if (bx >= 128-8) bx = 0;
     display.display();    
   }
 
@@ -1005,9 +1095,50 @@ void loop()
     //digitalWrite(BUZZER,digitalRead(BUZZER)^1);
     digitalWrite(CTRL4GWIFI,digitalRead(LED_STATUS));
     digitalWrite(EXCS,digitalRead(LED_STATUS));                                                                                                                                                                                                                                                                                ;
-    digitalWrite(ONEWIRE,digitalRead(LED_STATUS));
+    //digitalWrite(ONEWIRE,digitalRead(LED_STATUS));
 
     calc_ntc();
+#if usenon == 1    
+    sensorDs18b20.requestTemperature();
+
+    // Call sensors.requestTemperatures() to issue a global temperature and Requests to all devices on the bus
+    sensors.requestTemperatures();     
+    Serial.print("Celsius temperature: ");
+    // Why "byIndex"? You can have more than one IC on the same bus. 0 refers to the first IC on the wire
+    Serial.print(sensors.getTempCByIndex(0)); 
+    Serial.print(", ");
+    Serial.println(sensors.getTempCByIndex(1)); 
+#elif usenon == 2    
+    Serial.print("Requesting temperatures...");
+    sensors.requestTemperatures();
+    Serial.println("DONE");
+    // print the device information
+    printData(insideThermometer);
+    printData(outsideThermometer);
+#else  
+    oneWire.reset();
+    oneWire.write(0xcc);
+    oneWire.write(0xbe);
+    uint8_t tdata[9];
+    for(int i = 0; i < 9; ++i)
+      tdata[i] = oneWire.read();
+    oneWire.reset();
+    oneWire.write(0xcc);
+    oneWire.write(0x44);
+
+    if(tdata[8] == oneWire.crc8(tdata,8)) {
+      Serial.println("#18B20 Crc Ok");
+      uint16_t tempb = tdata[0] + (tdata[1] << 8);
+      Serial.printf("#Temp = %0.1f\n",(float)tempb/16);
+    }
+    else {
+      Serial.println("#18B20 Crc Fail");
+    }
+
+    oneWire.reset();
+    oneWire.write(0xcc);
+    oneWire.write(0xbe);
+#endif
 
     //Serial.print("NTC ADC = "); 
     //Serial.println((int)average);
@@ -1019,6 +1150,10 @@ void loop()
     display.setCursor(0, 9);
     display.printf("#NTC Temp.",average);
     display.printf(" = %0.1f C",steinhart);
+    display.fillRect(0,27,128,9,SSD1306_BLACK);
+    display.fillRect(bx,29,8,2,SSD1306_WHITE);
+    bx += 8;
+    if (bx >= 128-8) bx = 0;
     display.display();
 
     //Serial.printf("Rain = %d\n",digitalRead(RAINPULSE));
@@ -2085,3 +2220,84 @@ void testFileIO(fs::FS &fs, const char * path){
   Serial.printf("%u bytes written for %u ms\n", 2048 * 512, end);
   file.close();
 }
+
+#if usenon == 1
+
+//Invoked at every VALID sensor reading. "valid" parameter will be removed in a feature version
+void handleIntervalElapsed(float temperature, bool valid, int deviceIndex){
+
+  Serial.print("Sensor ");
+  Serial.print(deviceIndex);
+  Serial.print(" temperature: ");
+  Serial.print(temperature);
+  Serial.println(" °C");
+
+  /*
+   *  DO SOME AMAZING STUFF WITH THE TEMPERATURE
+   */
+}
+
+//Invoked ONLY when the temperature changes between two VALID sensor readings. "valid" parameter will be removed in a feature version
+void handleTemperatureChange(float temperature, bool valid, int deviceIndex){
+
+  Serial.print("Sensor ");
+  Serial.print(deviceIndex);
+  Serial.print(" new temperature: ");
+  Serial.print(temperature);
+  Serial.println(" °C");
+  
+  /*
+   *  DO SOME AMAZING STUFF WITH THE TEMPERATURE
+   */
+}
+
+//Invoked when the sensor reading fails
+void handleDeviceDisconnected(int deviceIndex){
+  Serial.print("Sensor ");
+  Serial.print(deviceIndex);
+  Serial.println(" disconnected.");
+}
+
+#endif
+
+#if usenon == 2
+// function to print a device address
+void printAddress(DeviceAddress deviceAddress)
+{
+  for (uint8_t i = 0; i < 8; i++)
+  {
+    // zero pad the address if necessary
+    if (deviceAddress[i] < 16) Serial.print("0");
+    Serial.print(deviceAddress[i], HEX);
+  }
+}
+
+// function to print the temperature for a device
+void printTemperature(DeviceAddress deviceAddress)
+{
+  float tempC = sensors.getTempC(deviceAddress);
+  Serial.print("Temp C: ");
+  Serial.print(tempC);
+  Serial.print(" Temp F: ");
+  Serial.print(DallasTemperature::toFahrenheit(tempC));
+}
+
+// function to print a device's resolution
+void printResolution(DeviceAddress deviceAddress)
+{
+  Serial.print("Resolution: ");
+  Serial.print(sensors.getResolution(deviceAddress));
+  Serial.println();    
+}
+
+// main function to print information about a device
+void printData(DeviceAddress deviceAddress)
+{
+  Serial.print("Device Address: ");
+  printAddress(deviceAddress);
+  Serial.print(" ");
+  printTemperature(deviceAddress);
+  Serial.println();
+}
+
+#endif
