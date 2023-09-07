@@ -1163,10 +1163,6 @@ void loop()
     else {
       Serial.println("#18B20 Crc Fail");
     }
-
-    oneWire.reset();
-    oneWire.write(0xcc);
-    oneWire.write(0xbe);
 #endif
 
     //Serial.print("NTC ADC = "); 
