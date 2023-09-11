@@ -143,11 +143,13 @@ void testanimate(const uint8_t *bitmap, uint8_t w, uint8_t h);
 // but is more 'smooth'
 #define NUMSAMPLES 5
 // The beta coefficient of the thermistor (usually 3000-4000)
-#define BCOEFFICIENT 3425
+//#define BCOEFFICIENT 3425
+#define BCOEFFICIENT 3950
 // the value of the 'other' resistor
 #define SERIESRESISTOR 10000    
 int samples[NUMSAMPLES];
 float steinhart;
+float steinhart0;
 float average = 0;
 
 
@@ -964,26 +966,53 @@ void short_beep()
   digitalWrite(BUZZER,LOW);
 }
 
+void calc_ntc0()
+{
+  int Vo;
+  float R1 = 10000;
+  float logR2, R2, tKelvin, tCelsius, tFahrenheit;
+  float c1 = 1.009249522e-03, c2 = 2.378405444e-04, c3 = 2.019202697e-07;
+
+  average = 0;
+  for (int i = 0; i < NUMSAMPLES; ++i) {
+    average += analogRead(THERMISTORPIN);
+    delay(10);
+  }
+  average /= NUMSAMPLES;
+  Vo = average;
+  R2 = R1 * (4095.0 / (float)Vo - 1.0); // resistance of the Thermistor
+  logR2 = log(R2);
+  tKelvin = (1.0 / (c1 + c2 * logR2 + c3 * logR2 * logR2 * logR2));
+  tCelsius = tKelvin - 273.15;
+  tFahrenheit = (tCelsius * 9.0) / 5.0 + 32.0;    
+  steinhart0 = tCelsius;
+}
+
 void calc_ntc()
 {
-    int Vo;
-    float R1 = 10000;
-    float logR2, R2, tKelvin, tCelsius, tFahrenheit;
-    float c1 = 1.009249522e-03, c2 = 2.378405444e-04, c3 = 2.019202697e-07;
+  // 1/T = 1/T0+(1/B)*ln(R/R0)
 
-    average = 0;
-    for (int i = 0; i < NUMSAMPLES; ++i) {
-      average += analogRead(THERMISTORPIN);
-      delay(10);
-    }
-    average /= NUMSAMPLES;
-    Vo = average;
-    R2 = R1 * (4095.0 / (float)Vo - 1.0); // resistance of the Thermistor
-    logR2 = log(R2);
-    tKelvin = (1.0 / (c1 + c2 * logR2 + c3 * logR2 * logR2 * logR2));
-    tCelsius = tKelvin - 273.15;
-    tFahrenheit = (tCelsius * 9.0) / 5.0 + 32.0;    
-    steinhart = tCelsius;
+  int Vo; // Holds the ADC Value
+  float R2, tKelvin, tCelsius, tFahrenheit;
+  const float Beta     = BCOEFFICIENT;
+  const float roomTemp = 298.15;   // room temperature in Kelvin
+  const float Ro = THERMISTORNOMINAL; // Resistance of the thermistor at roomTemp
+  const float R1 = SERIESRESISTOR;  // Resistnce of the known resistor  
+
+  average = 0;
+  for (int i = 0; i < NUMSAMPLES; ++i) {
+    average += analogRead(THERMISTORPIN);
+    delay(10);
+  }
+  average /= NUMSAMPLES;
+  Vo = average;
+
+  R2 = R1 * (4095.0 / (float)Vo - 1.0); // Resistance of the Thermistor
+  tKelvin = (Beta * roomTemp) /
+            (Beta + (roomTemp * log(R2 / Ro)));
+  tCelsius = tKelvin - 273.15;
+  tFahrenheit = (tCelsius * 9.0) / 5.0 + 32.0;
+  steinhart = tCelsius;
 }
 
 void loop()
@@ -1024,9 +1053,9 @@ void loop()
   if(digitalRead(SW1)==LOW) {
     delay(20);
     if(digitalRead(SW1)==LOW) {
-      Serial.println("#SW1 Press");
+      Serial.println("#SW1 (UP) Press");
       display.setCursor(112-8*4, 0);
-      display.printf("1");
+      display.printf("U");
       display.display();    
       short_beep();
       while(digitalRead(SW1)==LOW);
@@ -1038,9 +1067,9 @@ void loop()
   if(digitalRead(SW2)==LOW) {
     delay(20);
     if(digitalRead(SW2)==LOW) {
-      Serial.println("#SW2 Press");
+      Serial.println("#SW2 (DOWN) Press");
       display.setCursor(112-8*3, 0);
-      display.printf("2");
+      display.printf("D");
       display.display();    
       short_beep();
       while(digitalRead(SW2)==LOW);
@@ -1052,9 +1081,9 @@ void loop()
   if(digitalRead(SW3)==LOW) {
     delay(20);
     if(digitalRead(SW3)==LOW) {
-      Serial.println("#SW3 Press");
+      Serial.println("#SW3 (RIGHT) Press");
       display.setCursor(112-8*2, 0);
-      display.printf("3");
+      display.printf("R");
       display.display();    
       short_beep();
       while(digitalRead(SW3)==LOW);
@@ -1066,9 +1095,9 @@ void loop()
   if(digitalRead(SW4)==LOW) {
     delay(20);
     if(digitalRead(SW4)==LOW) {
-      Serial.println("#SW4 Press");
+      Serial.println("#SW4 (LEFT) Press");
       display.setCursor(112-8*1, 0);
-      display.printf("4");
+      display.printf("L");
       display.display();    
       short_beep();
       while(digitalRead(SW4)==LOW);
@@ -1126,6 +1155,7 @@ void loop()
     }
     display.display();
 
+    calc_ntc0();
     calc_ntc();
 #if usenon == 1    
     sensorDs18b20.requestTemperature();
@@ -1167,6 +1197,9 @@ void loop()
 
     //Serial.print("NTC ADC = "); 
     //Serial.println((int)average);
+    Serial.print("Temperature0 "); 
+    Serial.print(steinhart0);
+    Serial.println(" *C");
     Serial.print("Temperature "); 
     Serial.print(steinhart);
     Serial.println(" *C");
@@ -1216,12 +1249,16 @@ void loop()
     Serial2.end();    
     delay(20);
 
+    digitalWrite(RS485RE_DE,HIGH);
+    delay(1);
     Serial1.printf("#RTC Date = %02d/%02d/%04d Time = %02d:%02d:%02d Day=%s\r\n",now.day(),now.month(),now.year()+543,now.hour(),now.minute(),now.second(),daysOfTheWeek[now.dayOfTheWeek()]);
-    Serial1.print("#Canbus/UART/RS232 ");
+    Serial1.print("#Canbus/UART/RS232/RS485 ");
     Serial1.print("Temperature "); 
     Serial1.print(steinhart);
     Serial1.println(" *C\n");
     Serial1.flush();
+    delay(1);
+    digitalWrite(RS485RE_DE,LOW);
     delay(20);
 
     Serial.println();
