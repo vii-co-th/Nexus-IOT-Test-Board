@@ -1,8 +1,247 @@
 #include <Arduino.h>
 #include <SPI.h>
 #include <Wire.h>
+
+#define  ADAFRUITSSD1306 0
+#define  U8G2SH1106 1
+
+char str80[80];
+
+
+#if ADAFRUITSSD1306 > 0
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
+
+#elif U8G2SH1106 > 0
+#include <U8g2lib.h>
+//U8G2_SH1106_128X64_NONAME_1_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE);
+U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE);
+
+
+void u8g2_prepare(void) {
+  u8g2.setFont(u8g2_font_6x10_tf);
+  u8g2.setFontRefHeightExtendedText();
+  u8g2.setDrawColor(1);
+  u8g2.setFontPosTop();
+  u8g2.setFontDirection(0);
+}
+
+void u8g2_box_title(uint8_t a) {
+  u8g2.drawStr( 10+a*2, 5, "U8g2");
+  u8g2.drawStr( 10, 20, "GraphicsTest");
+  
+  u8g2.drawFrame(0,0,u8g2.getDisplayWidth(),u8g2.getDisplayHeight() );
+}
+
+void u8g2_box_frame(uint8_t a) {
+  u8g2.drawStr( 0, 0, "drawBox");
+  u8g2.drawBox(5,10,20,10);
+  u8g2.drawBox(10+a,15,30,7);
+  u8g2.drawStr( 0, 30, "drawFrame");
+  u8g2.drawFrame(5,10+30,20,10);
+  u8g2.drawFrame(10+a,15+30,30,7);
+}
+
+void u8g2_disc_circle(uint8_t a) {
+  u8g2.drawStr( 0, 0, "drawDisc");
+  u8g2.drawDisc(10,18,9);
+  u8g2.drawDisc(24+a,16,7);
+  u8g2.drawStr( 0, 30, "drawCircle");
+  u8g2.drawCircle(10,18+30,9);
+  u8g2.drawCircle(24+a,16+30,7);
+}
+
+void u8g2_r_frame(uint8_t a) {
+  u8g2.drawStr( 0, 0, "drawRFrame/Box");
+  u8g2.drawRFrame(5, 10,40,30, a+1);
+  u8g2.drawRBox(50, 10,25,40, a+1);
+}
+
+void u8g2_string(uint8_t a) {
+  u8g2.setFontDirection(0);
+  u8g2.drawStr(30+a,31, " 0");
+  u8g2.setFontDirection(1);
+  u8g2.drawStr(30,31+a, " 90");
+  u8g2.setFontDirection(2);
+  u8g2.drawStr(30-a,31, " 180");
+  u8g2.setFontDirection(3);
+  u8g2.drawStr(30,31-a, " 270");
+}
+
+void u8g2_line(uint8_t a) {
+  u8g2.drawStr( 0, 0, "drawLine");
+  u8g2.drawLine(7+a, 10, 40, 55);
+  u8g2.drawLine(7+a*2, 10, 60, 55);
+  u8g2.drawLine(7+a*3, 10, 80, 55);
+  u8g2.drawLine(7+a*4, 10, 100, 55);
+}
+
+void u8g2_triangle(uint8_t a) {
+  uint16_t offset = a;
+  u8g2.drawStr( 0, 0, "drawTriangle");
+  u8g2.drawTriangle(14,7, 45,30, 10,40);
+  u8g2.drawTriangle(14+offset,7-offset, 45+offset,30-offset, 57+offset,10-offset);
+  u8g2.drawTriangle(57+offset*2,10, 45+offset*2,30, 86+offset*2,53);
+  u8g2.drawTriangle(10+offset,40+offset, 45+offset,30+offset, 86+offset,53+offset);
+}
+
+void u8g2_ascii_1() {
+  char s[2] = " ";
+  uint8_t x, y;
+  u8g2.drawStr( 0, 0, "ASCII page 1");
+  for( y = 0; y < 6; y++ ) {
+    for( x = 0; x < 16; x++ ) {
+      s[0] = y*16 + x + 32;
+      u8g2.drawStr(x*7, y*10+10, s);
+    }
+  }
+}
+
+void u8g2_ascii_2() {
+  char s[2] = " ";
+  uint8_t x, y;
+  u8g2.drawStr( 0, 0, "ASCII page 2");
+  for( y = 0; y < 6; y++ ) {
+    for( x = 0; x < 16; x++ ) {
+      s[0] = y*16 + x + 160;
+      u8g2.drawStr(x*7, y*10+10, s);
+    }
+  }
+}
+
+void u8g2_extra_page(uint8_t a)
+{
+  u8g2.drawStr( 0, 0, "Unicode");
+  u8g2.setFont(u8g2_font_unifont_t_symbols);
+  u8g2.setFontPosTop();
+  u8g2.drawUTF8(0, 24, "☀ ☁");
+  switch(a) {
+    case 0:
+    case 1:
+    case 2:
+    case 3:
+      u8g2.drawUTF8(a*3, 36, "☂");
+      break;
+    case 4:
+    case 5:
+    case 6:
+    case 7:
+      u8g2.drawUTF8(a*3, 36, "☔");
+      break;
+  }
+}
+
+void u8g2_xor(uint8_t a) {
+  uint8_t i;
+  u8g2.drawStr( 0, 0, "XOR");
+  u8g2.setFontMode(1);
+  u8g2.setDrawColor(2);
+  for( i = 0; i < 5; i++)
+  {
+    u8g2.drawBox(10+i*16, 18 + (i&1)*4, 21,31);
+  }
+  u8g2.drawStr( 5+a, 19, "XOR XOR XOR XOR");
+  u8g2.setDrawColor(0);
+  u8g2.drawStr( 5+a, 29, "CLR CLR CLR CLR");
+  u8g2.setDrawColor(1);
+  u8g2.drawStr( 5+a, 39, "SET SET SET SET");
+  u8g2.setFontMode(0);
+    
+}
+
+#define cross_width 24
+#define cross_height 24
+static const unsigned char cross_bits[] U8X8_PROGMEM  = {
+  0x00, 0x18, 0x00, 0x00, 0x24, 0x00, 0x00, 0x24, 0x00, 0x00, 0x42, 0x00, 
+  0x00, 0x42, 0x00, 0x00, 0x42, 0x00, 0x00, 0x81, 0x00, 0x00, 0x81, 0x00, 
+  0xC0, 0x00, 0x03, 0x38, 0x3C, 0x1C, 0x06, 0x42, 0x60, 0x01, 0x42, 0x80, 
+  0x01, 0x42, 0x80, 0x06, 0x42, 0x60, 0x38, 0x3C, 0x1C, 0xC0, 0x00, 0x03, 
+  0x00, 0x81, 0x00, 0x00, 0x81, 0x00, 0x00, 0x42, 0x00, 0x00, 0x42, 0x00, 
+  0x00, 0x42, 0x00, 0x00, 0x24, 0x00, 0x00, 0x24, 0x00, 0x00, 0x18, 0x00, };
+
+#define cross_fill_width 24
+#define cross_fill_height 24
+static const unsigned char cross_fill_bits[] U8X8_PROGMEM  = {
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x18, 0x00, 0x18, 0x64, 0x00, 0x26, 
+  0x84, 0x00, 0x21, 0x08, 0x81, 0x10, 0x08, 0x42, 0x10, 0x10, 0x3C, 0x08, 
+  0x20, 0x00, 0x04, 0x40, 0x00, 0x02, 0x80, 0x00, 0x01, 0x80, 0x18, 0x01, 
+  0x80, 0x18, 0x01, 0x80, 0x00, 0x01, 0x40, 0x00, 0x02, 0x20, 0x00, 0x04, 
+  0x10, 0x3C, 0x08, 0x08, 0x42, 0x10, 0x08, 0x81, 0x10, 0x84, 0x00, 0x21, 
+  0x64, 0x00, 0x26, 0x18, 0x00, 0x18, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, };
+
+#define cross_block_width 14
+#define cross_block_height 14
+static const unsigned char cross_block_bits[] U8X8_PROGMEM  = {
+  0xFF, 0x3F, 0x01, 0x20, 0x01, 0x20, 0x01, 0x20, 0x01, 0x20, 0x01, 0x20, 
+  0xC1, 0x20, 0xC1, 0x20, 0x01, 0x20, 0x01, 0x20, 0x01, 0x20, 0x01, 0x20, 
+  0x01, 0x20, 0xFF, 0x3F, };
+
+void u8g2_bitmap_overlay(uint8_t a) {
+  uint8_t frame_size = 28;
+
+  u8g2.drawStr(0, 0, "Bitmap overlay");
+
+  u8g2.drawStr(0, frame_size + 12, "Solid / transparent");
+  u8g2.setBitmapMode(false /* solid */);
+  u8g2.drawFrame(0, 10, frame_size, frame_size);
+  u8g2.drawXBMP(2, 12, cross_width, cross_height, cross_bits);
+  if(a & 4)
+    u8g2.drawXBMP(7, 17, cross_block_width, cross_block_height, cross_block_bits);
+
+  u8g2.setBitmapMode(true /* transparent*/);
+  u8g2.drawFrame(frame_size + 5, 10, frame_size, frame_size);
+  u8g2.drawXBMP(frame_size + 7, 12, cross_width, cross_height, cross_bits);
+  if(a & 4)
+    u8g2.drawXBMP(frame_size + 12, 17, cross_block_width, cross_block_height, cross_block_bits);
+}
+
+void u8g2_bitmap_modes(uint8_t transparent) {
+  const uint8_t frame_size = 24;
+
+  u8g2.drawBox(0, frame_size * 0.5, frame_size * 5, frame_size);
+  u8g2.drawStr(frame_size * 0.5, 50, "Black");
+  u8g2.drawStr(frame_size * 2, 50, "White");
+  u8g2.drawStr(frame_size * 3.5, 50, "XOR");
+  
+  if(!transparent) {
+    u8g2.setBitmapMode(false /* solid */);
+    u8g2.drawStr(0, 0, "Solid bitmap");
+  } else {
+    u8g2.setBitmapMode(true /* transparent*/);
+    u8g2.drawStr(0, 0, "Transparent bitmap");
+  }
+  u8g2.setDrawColor(0);// Black
+  u8g2.drawXBMP(frame_size * 0.5, 24, cross_width, cross_height, cross_bits);
+  u8g2.setDrawColor(1); // White
+  u8g2.drawXBMP(frame_size * 2, 24, cross_width, cross_height, cross_bits);
+  u8g2.setDrawColor(2); // XOR
+  u8g2.drawXBMP(frame_size * 3.5, 24, cross_width, cross_height, cross_bits);
+}
+
+uint8_t draw_state = 0;
+
+void draw(void) {
+  u8g2_prepare();
+  switch(draw_state >> 3) {
+    case 0: u8g2_box_title(draw_state&7); break;
+    case 1: u8g2_box_frame(draw_state&7); break;
+    case 2: u8g2_disc_circle(draw_state&7); break;
+    case 3: u8g2_r_frame(draw_state&7); break;
+    case 4: u8g2_string(draw_state&7); break;
+    case 5: u8g2_line(draw_state&7); break;
+    case 6: u8g2_triangle(draw_state&7); break;
+    case 7: u8g2_ascii_1(); break;
+    case 8: u8g2_ascii_2(); break;
+    case 9: u8g2_extra_page(draw_state&7); break;
+    case 10: u8g2_xor(draw_state&7); break;
+    case 11: u8g2_bitmap_modes(0); break;
+    case 12: u8g2_bitmap_modes(1); break;
+    case 13: u8g2_bitmap_overlay(draw_state&7); break;
+  }
+}
+
+
+#endif
 
 #define testcanbus  1
   
@@ -86,7 +325,7 @@ MHZ19E mhz19e;
 
 //OLED
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
-#define SCREEN_HEIGHT 32 // OLED display height, in pixels
+#define SCREEN_HEIGHT 64 // OLED display height, in pixels  64
 
 // Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
 // The pins for I2C are defined by the Wire-library. 
@@ -95,7 +334,11 @@ MHZ19E mhz19e;
 // On an arduino LEONARDO:   2(SDA),  3(SCL), ...
 #define OLED_RESET     -1 // Reset pin # (or -1 if sharing Arduino reset pin)
 #define SCREEN_ADDRESS 0x3C ///< See datasheet for Address; 0x3D for 128x64, 0x3C for 128x32
+
+#if ADAFRUITSSD1306 > 0
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+#endif
+
 #define NUMFLAKES     10 // Number of snowflakes in the animation example
 
 #define LOGO_HEIGHT   16
@@ -700,7 +943,6 @@ void enable_wifi()
   // Configures static IP address
   WiFi.softAPConfig(apip,apgw,apsn);
 
-  //wifiMulti.addAP(ssid.c_str(),password);
   WiFi.softAP(ssid.c_str(),password);
 
   WiFi.mode(WIFI_AP_STA);
@@ -711,7 +953,9 @@ void enable_wifi()
   Serial.println(WiFi.softAPIP());
 
   WiFi.setHostname(host);
-  WiFi.begin(wifissid.c_str(), wifipassword.c_str());
+  //WiFi.begin(wifissid.c_str(), wifipassword.c_str());
+  wifiMulti.addAP(wifissid.c_str(),wifipassword.c_str());
+  wifiMulti.addAP("Chotlan_2.4G","98765abcde");
 
   Serial.printf("#WiFi SSID = %s\r\n",wifissid.c_str());
   Serial.printf("#WiFi Pass = %s\r\n",wifipassword.c_str());
@@ -719,7 +963,8 @@ void enable_wifi()
   uint8_t twifi = 0;
 
   int wc = 0;
-  while (WiFi.status() != WL_CONNECTED) {
+//  while (WiFi.status() != WL_CONNECTED) {
+  while (wifiMulti.run() != WL_CONNECTED) {
     esp_task_wdt_reset();
     delay(500);
     Serial.print(".");
@@ -883,6 +1128,8 @@ void setup()
 #else
 #endif
 
+#if ADAFRUITSSD1306 > 0
+
   if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
     Serial.println(F("#SSD1306 allocation failed"));
     for(;;); // Don't proceed, loop forever
@@ -890,6 +1137,11 @@ void setup()
   else {
     Serial.println(F("#SSD1306 allocation ok"));
   }
+#endif
+#if U8G2SH1106 > 0
+  u8g2.begin();
+#endif
+
 
 #if usenon == 1
   //Initialize the sensor passing the resolution, unit of measure and reading interval [milliseconds]
@@ -938,7 +1190,9 @@ void setup()
   oneWire.write(0xcc);
   oneWire.write(0x44);
 #endif  
-  
+
+#if ADAFRUITSSD1306 > 0
+
   // Show initial display buffer contents on the screen --
   // the library initializes this with an Adafruit splash screen.
   display.clearDisplay();
@@ -947,6 +1201,16 @@ void setup()
   display.setCursor(0, 0);
   display.println(F("#Ready"));
   display.display();
+#endif
+#if U8G2SH1106  > 0
+  u8g2.clearBuffer();
+  u8g2_prepare();
+  //u8g2.firstPage();  
+  //do {
+    u8g2.drawStr(0,0,"#Ready");
+  //} while( u8g2.nextPage() );  
+  u8g2.sendBuffer();
+#endif
 
   digitalWrite(BUZZER,HIGH);
   Serial.println("#Ready");
@@ -1054,13 +1318,35 @@ void loop()
     delay(20);
     if(digitalRead(SW1)==LOW) {
       Serial.println("#SW1 (UP) Press");
+#if ADAFRUITSSD1306 > 0
       display.setCursor(112-8*4, 0);
       display.printf("U");
       display.display();    
+#endif      
+#if U8G2SH1106  > 0
+//  u8g2.firstPage();  
+//  do {
+    u8g2.setDrawColor(1);
+    u8g2.drawStr(112-8*4, 0,"U");
+    u8g2.sendBuffer();
+//  } while( u8g2.nextPage() );  
+#endif
+
       short_beep();
       while(digitalRead(SW1)==LOW);
+#if ADAFRUITSSD1306 > 0
       display.fillRect(112-8*4,0,8,8,SSD1306_BLACK);
       display.display();    
+#endif      
+#if U8G2SH1106  > 0
+  //u8g2.firstPage();  
+  //do {
+    u8g2.setDrawColor(0);
+    u8g2.drawBox(112-8*4,0,8,10);
+  //} while( u8g2.nextPage() );  
+  u8g2.sendBuffer();
+
+#endif
     }
   }
 
@@ -1068,13 +1354,34 @@ void loop()
     delay(20);
     if(digitalRead(SW2)==LOW) {
       Serial.println("#SW2 (DOWN) Press");
+#if ADAFRUITSSD1306 > 0
       display.setCursor(112-8*3, 0);
       display.printf("D");
       display.display();    
+#endif      
+#if U8G2SH1106  > 0
+  //u8g2.firstPage();  
+  //do {
+    u8g2.setDrawColor(1);
+    u8g2.drawStr(112-8*3, 0,"D");
+  //} while( u8g2.nextPage() );  
+    u8g2.sendBuffer();
+#endif
       short_beep();
       while(digitalRead(SW2)==LOW);
+#if ADAFRUITSSD1306 > 0
       display.fillRect(112-8*3,0,8,8,SSD1306_BLACK);
       display.display();    
+#endif      
+#if U8G2SH1106  > 0
+  //u8g2.firstPage();  
+  //do {
+    u8g2.setDrawColor(0);
+    u8g2.drawBox(112-8*3,0,8,10);
+  //} while( u8g2.nextPage() );  
+    u8g2.sendBuffer();
+
+#endif
     }
   }
 
@@ -1082,13 +1389,33 @@ void loop()
     delay(20);
     if(digitalRead(SW3)==LOW) {
       Serial.println("#SW3 (RIGHT) Press");
+#if ADAFRUITSSD1306 > 0
       display.setCursor(112-8*2, 0);
       display.printf("R");
       display.display();    
+#endif      
+#if U8G2SH1106  > 0
+  //u8g2.firstPage();  
+  //do {
+    u8g2.setDrawColor(1);
+    u8g2.drawStr(112-8*2, 0,"R");
+  //} while( u8g2.nextPage() );  
+    u8g2.sendBuffer();
+#endif
       short_beep();
       while(digitalRead(SW3)==LOW);
+#if ADAFRUITSSD1306 > 0
       display.fillRect(112-8*2,0,8,8,SSD1306_BLACK);
       display.display();    
+#endif      
+#if U8G2SH1106  > 0
+  //u8g2.firstPage();  
+  //do {
+    u8g2.setDrawColor(0);
+    u8g2.drawBox(112-8*2,0,8,10);
+  //} while( u8g2.nextPage() );  
+  u8g2.sendBuffer();
+#endif
     }
   }
 
@@ -1096,13 +1423,35 @@ void loop()
     delay(20);
     if(digitalRead(SW4)==LOW) {
       Serial.println("#SW4 (LEFT) Press");
+#if ADAFRUITSSD1306 > 0
       display.setCursor(112-8*1, 0);
       display.printf("L");
       display.display();    
+#endif      
+#if U8G2SH1106  > 0
+  //u8g2.firstPage();  
+  //do {
+    u8g2.setDrawColor(1);
+    u8g2.drawStr(112-8*1, 0,"L");
+  //} while( u8g2.nextPage() );  
+  u8g2.sendBuffer();
+
+#endif
       short_beep();
       while(digitalRead(SW4)==LOW);
+#if ADAFRUITSSD1306 > 0
       display.fillRect(112-8*1,0,8,8,SSD1306_BLACK);
       display.display();    
+#endif      
+#if U8G2SH1106  > 0
+  //u8g2.firstPage();  
+  //do {
+    u8g2.setDrawColor(0);
+    u8g2.drawBox(112-8*1,0,8,10);
+  //} while( u8g2.nextPage() );  
+  u8g2.sendBuffer();
+
+#endif
     }
   }
 
@@ -1110,12 +1459,27 @@ void loop()
   if((uint32_t)(millis()-tsec) >= 1000) {
     tsec = millis();
     DateTime now = rtc.now();
+#if ADAFRUITSSD1306 > 0
     display.fillRect(0,18,128,15,SSD1306_BLACK);
     display.setTextSize(1);
     display.setCursor(0, 18);
     display.printf("%02d/%02d/%02d %02d:%02d:%02d %c%c",now.day(),now.month(),now.year()+543-2500,now.hour(),now.minute(),now.second(),daysOfTheWeek[now.dayOfTheWeek()][0],daysOfTheWeek[now.dayOfTheWeek()][1],daysOfTheWeek[now.dayOfTheWeek()][2]);
     //display.fillRect(0,27,128,9,SSD1306_BLACK);
     display.fillRect(bx,29-(bh-1),8,bh*2-1,SSD1306_WHITE);
+#endif    
+#if U8G2SH1106  > 0
+  //u8g2.firstPage();  
+  //do {
+    u8g2.setDrawColor(0);
+    u8g2.drawBox(0,20,128,17);
+    u8g2.setDrawColor(1);
+    sprintf(str80,"%02d/%02d/%02d %02d:%02d:%02d %c%c",now.day(),now.month(),now.year()+543-2500,now.hour(),now.minute(),now.second(),daysOfTheWeek[now.dayOfTheWeek()][0],daysOfTheWeek[now.dayOfTheWeek()][1],daysOfTheWeek[now.dayOfTheWeek()][2]);
+    u8g2.drawStr(0,20,str80);
+    u8g2.drawBox(bx,35-(bh-1),8,bh*2-1);
+  //} while( u8g2.nextPage() );  
+
+#endif
+
     if (bhdir == 1) {
       ++bh; 
       if (bh > 3) {
@@ -1132,8 +1496,12 @@ void loop()
     }
     bx += 8;
     if (bx >= 128-8) bx = 0;
-
+#if ADAFRUITSSD1306 > 0
     display.display();    
+#endif    
+#if U8G2SH1106  > 0
+    u8g2.sendBuffer();
+#endif
   }
 
   if((uint32_t)(millis()-tsendscreen) >= SCREEN_TIME && SCREEN_TIME > 0) {
@@ -1146,6 +1514,7 @@ void loop()
     digitalWrite(CTRL4GWIFI,digitalRead(LED_STATUS));
     digitalWrite(EXCS,digitalRead(LED_STATUS));                                                                                                                                                                                                                                                                                ;
     //digitalWrite(ONEWIRE,digitalRead(LED_STATUS));
+#if ADAFRUITSSD1306 > 0
     if (digitalRead(LED_STATUS) == HIGH) {
       display.fillCircle(122,4,4,SSD1306_WHITE);
     }
@@ -1154,6 +1523,24 @@ void loop()
       display.drawCircle(122,4,4,SSD1306_WHITE);
     }
     display.display();
+#endif
+#if U8G2SH1106  > 0
+  //u8g2.firstPage();  
+  //do {    
+    if (digitalRead(LED_STATUS) == HIGH) {
+      u8g2.setDrawColor(1);
+      u8g2.drawDisc(122,4,4);
+    }
+    else {
+      u8g2.setDrawColor(0);
+      u8g2.drawBox(116,0,12,10);
+      u8g2.setDrawColor(1);
+      u8g2.drawCircle(122,4,4);
+    }
+  //} while( u8g2.nextPage() );  
+    u8g2.sendBuffer();
+
+#endif
 
     calc_ntc0();
     calc_ntc();
@@ -1203,12 +1590,26 @@ void loop()
     Serial.print("Temperature "); 
     Serial.print(steinhart);
     Serial.println(" *C");
+#if ADAFRUITSSD1306 > 0
     display.fillRect(0,9,128,9,SSD1306_BLACK);
     display.setTextSize(1);
     display.setCursor(0, 9);
     display.printf("#NTC Temp.",average);
     display.printf(" = %0.1f C",steinhart);
     display.display();
+#endif
+#if U8G2SH1106  > 0
+  //u8g2.firstPage();  
+  //do {    
+    u8g2.setDrawColor(0);
+    u8g2.drawBox(0,11,128,10);
+    sprintf(str80,"#NTC Temp. = %0.1f C",steinhart);
+    u8g2.setDrawColor(1);
+    u8g2.drawStr(0,11,str80);
+  //} while( u8g2.nextPage() );  
+  u8g2.sendBuffer();
+
+#endif
 
     //Serial.printf("Rain = %d\n",digitalRead(RAINPULSE));
     //Serial.printf("Wind = %d\n",digitalRead(WINDPULSE));
@@ -1832,6 +2233,7 @@ void pwm_out()
   //analogWrite(IOPIN5, outputpwm);      
 }
 
+#if ADAFRUITSSD1306 > 0
 void testdrawline() {
   int16_t i;
 
@@ -2121,6 +2523,7 @@ void testanimate(const uint8_t *bitmap, uint8_t w, uint8_t h) {
     }
   }
 }
+#endif
 
 void listDir(fs::FS &fs, const char * dirname, uint8_t levels){
   Serial.printf("Listing directory: %s\n", dirname);
