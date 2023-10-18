@@ -2,8 +2,8 @@
 #include <SPI.h>
 #include <Wire.h>
 
-#define  ADAFRUITSSD1306 0
-#define  U8G2SH1106 1
+#define  ADAFRUITSSD1306 0  //test with 128x32
+#define  U8G2SH1106 1       //test with 128x64
 
 char str80[80];
 
