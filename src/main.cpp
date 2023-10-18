@@ -1471,7 +1471,7 @@ void loop()
   //u8g2.firstPage();  
   //do {
     u8g2.setDrawColor(0);
-    u8g2.drawBox(0,20,128,17);
+    u8g2.drawBox(0,20,128,20);
     u8g2.setDrawColor(1);
     sprintf(str80,"%02d/%02d/%02d %02d:%02d:%02d %c%c",now.day(),now.month(),now.year()+543-2500,now.hour(),now.minute(),now.second(),daysOfTheWeek[now.dayOfTheWeek()][0],daysOfTheWeek[now.dayOfTheWeek()][1],daysOfTheWeek[now.dayOfTheWeek()][2]);
     u8g2.drawStr(0,20,str80);
