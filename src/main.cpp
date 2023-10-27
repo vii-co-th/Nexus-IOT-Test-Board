@@ -817,6 +817,18 @@ void write_adminpass_eeprom (char *s)
 void enable_wifi()
 {
 
+#if ADAFRUITSSD1306 > 0
+
+  // Show initial display buffer contents on the screen --
+  // the library initializes this with an Adafruit splash screen.
+  display.println(F("#Init WiFi..."));
+  display.display();
+#endif
+#if U8G2SH1106  > 0
+  u8g2.drawStr(0,10,"#Init WiFi...");
+  u8g2.sendBuffer();
+#endif
+
   //read wifi ssid & pass from EEPROM
   if (EEPROM.read(__SSID_ADDR__) != 0xff) {
     wifissid = "";
@@ -1077,6 +1089,43 @@ void setup()
   
   esp_task_wdt_init(WDT_TIMEOUT, true);  // enable panic so ESP32 restarts
   esp_task_wdt_add(NULL);  
+
+#if ADAFRUITSSD1306 > 0
+
+  if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
+    Serial-.println(F("#SSD1306 allocation failed"));
+    for(;;); // Don't proceed, loop forever
+  }
+  else {
+    Serial.println(F("#SSD1306 allocation ok"));
+  }
+#endif
+#if U8G2SH1106 > 0
+  u8g2.begin();
+#endif
+
+#if ADAFRUITSSD1306 > 0
+
+  // Show initial display buffer contents on the screen --
+  // the library initializes this with an Adafruit splash screen.
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(0, 0);
+  display.println(F("#Power On..."));
+  display.display();
+#endif
+#if U8G2SH1106  > 0
+  u8g2.clearBuffer();
+  u8g2_prepare();
+  //u8g2.firstPage();  
+  //do {
+    u8g2.drawStr(0,0,"#Power On...");
+  //} while( u8g2.nextPage() );  
+  u8g2.sendBuffer();
+#endif
+
+
   Serial.println("#Start wifi...");
   enable_wifi();
 
@@ -1121,25 +1170,11 @@ void setup()
   test_sdcard();
 
   Serial1.begin(baud,config,RX1,TX1);
-  #if testcanbus == 0
+#if testcanbus == 0
   modbus.begin(id,baud);
   modbus.configureInputRegisters(numInputRegisters, inputRegisterRead);
   Serial.println("#Init MODBUS done.");
 #else
-#endif
-
-#if ADAFRUITSSD1306 > 0
-
-  if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
-    Serial.println(F("#SSD1306 allocation failed"));
-    for(;;); // Don't proceed, loop forever
-  }
-  else {
-    Serial.println(F("#SSD1306 allocation ok"));
-  }
-#endif
-#if U8G2SH1106 > 0
-  u8g2.begin();
 #endif
 
 
