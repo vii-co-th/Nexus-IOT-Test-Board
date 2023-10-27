@@ -515,9 +515,9 @@ String mqtt_topic = "";
 String mqtt_iddf = "0001";
 String mqtt_serverdf = "iot.vii.co.th";
 String mqtt_portdf = "1883";
-String mqtt_userdf = "jca";
-String mqtt_passdf = "jcalambda";
-String mqtt_topicdf = "/jca/aqs";
+String mqtt_userdf = "xxxxx";
+String mqtt_passdf = "xxxxx";
+String mqtt_topicdf = "xxxxx";
 
 char cmqtt_topic[100];
 
@@ -612,7 +612,7 @@ IPAddress apsn(255,255,255,0);
 int wc = 0;
 byte isDHCP = 1;
 String remote_server = "iot.vii.co.th";
-String tel1 = "0811710428";
+String tel1 = "";
 String tel2 = "";
 String tel3 = "";
 
@@ -622,8 +622,8 @@ char fns[40];
 ulong wifistarttime = 0;
 
 uint8_t pwd_c;
-String wifissid = "LambdaNu";
-String wifipassword = "0818090157";
+String wifissid = "xxxxx";
+String wifipassword = "xxxxx";
 String adminpassword = "admin";
 
 char pwd_ch;
@@ -967,7 +967,7 @@ void enable_wifi()
   WiFi.setHostname(host);
   //WiFi.begin(wifissid.c_str(), wifipassword.c_str());
   wifiMulti.addAP(wifissid.c_str(),wifipassword.c_str());
-  wifiMulti.addAP("Chotlan_2.4G","98765abcde");
+  //wifiMulti.addAP("xxxxx","xxxxx");
 
   Serial.printf("#WiFi SSID = %s\r\n",wifissid.c_str());
   Serial.printf("#WiFi Pass = %s\r\n",wifipassword.c_str());
